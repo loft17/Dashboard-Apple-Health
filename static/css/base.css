@@ -1,0 +1,148 @@
+/* base.css — tema blanco minimalista */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #f7f7f5;
+  --surface:     #ffffff;
+  --surface-2:   #f0eeeb;
+  --border:      #e4e2de;
+  --border-2:    #d0cdc8;
+
+  --accent:      #111111;
+  --accent-dim:  rgba(17,17,17,.06);
+
+  --green:       #1a8a4a;
+  --green-dim:   rgba(26,138,74,.08);
+  --green-light: #e6f5ed;
+
+  --orange:      #c45000;
+  --orange-dim:  rgba(196,80,0,.08);
+  --orange-light:#fdf0e8;
+
+  --blue:        #1a5fa8;
+  --blue-dim:    rgba(26,95,168,.08);
+  --blue-light:  #e8f0fb;
+
+  --red:         #c0392b;
+  --text:        #111111;
+  --muted:       #888880;
+  --dim:         #c8c5bf;
+
+  --font-display: 'Inter', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+  --radius:       8px;
+  --radius-lg:    12px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Navbar ────────────────────────────────────────────────────────────────── */
+.navbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 28px; height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+
+.navbar-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.navbar-icon {
+  width: 26px; height: 26px; border-radius: 6px;
+  background: var(--text); display: flex; align-items: center; justify-content: center;
+}
+.navbar-icon svg { width: 14px; height: 14px; fill: white; }
+.navbar-brand { font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--text); }
+
+.navbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+
+.navbar-link {
+  font-size: 13px; font-weight: 400; color: var(--muted);
+  text-decoration: none; padding: 4px 10px; border-radius: 6px;
+  transition: color .15s, background .15s;
+}
+.navbar-link:hover  { color: var(--text); background: var(--accent-dim); }
+.navbar-link.active { color: var(--text); font-weight: 500; }
+
+.navbar-date {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--muted); letter-spacing: .03em;
+  white-space: nowrap;
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+.page { position: relative; min-height: 100vh; display: flex; flex-direction: column; }
+
+.main-content {
+  flex: 1; padding: 32px 28px;
+  max-width: 960px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* ── Section label ─────────────────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.footer {
+  text-align: center; padding: 18px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--dim); border-top: 1px solid var(--border);
+}
+.footer a { color: var(--muted); text-decoration: none; }
+.footer a:hover { color: var(--text); }
+
+/* ── Toast ─────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--text); color: white;
+  border-radius: 8px; padding: 10px 18px;
+  font-family: var(--font-mono); font-size: 12px;
+  opacity: 0; transition: all .25s ease;
+  pointer-events: none; white-space: nowrap; z-index: 200;
+}
+#toast.show   { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.success { background: var(--green); }
+#toast.error   { background: var(--red); }
+
+/* ── Animaciones ───────────────────────────────────────────────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: .35; }
+}
+
+@media (max-width: 680px) {
+  .main-content { padding: 20px 16px; }
+  .navbar       { padding: 0 16px; }
+}
+
+.pdf-export-btn {
+  display: flex; align-items: center; gap: 5px;
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer;
+  font-size: 12px; font-family: var(--font-mono);
+  color: var(--muted); transition: all .15s;
+}
+.pdf-export-btn:hover { border-color: var(--text); color: var(--text); }
+.pdf-export-btn:disabled { opacity: .5; cursor: wait; }

@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+{% block title %}Histórico{% endblock %}
+
+{% block extra_css %}
+<style>
+.hist-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+}
+.hist-title { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
+
+.period-tabs {
+  display: flex; gap: 3px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 3px;
+}
+.period-tab {
+  padding: 5px 16px; border-radius: 7px; border: none; background: none;
+  font-family: var(--font-mono); font-size: 12px; cursor: pointer;
+  color: var(--muted); transition: all .15s;
+}
+.period-tab.active { background: var(--text); color: var(--bg); font-weight: 600; }
+
+/* ── Sección ─────────────────────────────────────────────────────────────── */
+.hist-section { margin-bottom: 36px; }
+.hist-section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); font-family: var(--font-mono); margin-bottom: 14px;
+  padding-bottom: 8px; border-bottom: 2px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Tarjeta full-width ──────────────────────────────────────────────────── */
+.hist-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 14px;
+}
+.hist-card-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.hist-card-left { display: flex; flex-direction: column; gap: 3px; }
+.hist-card-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); font-family: var(--font-mono);
+}
+.hist-card-value-row {
+  display: flex; align-items: baseline; gap: 6px;
+}
+.hist-card-num  { font-size: 2rem; font-weight: 700; letter-spacing: -.04em; color: var(--text); }
+.hist-card-unit { font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
+.hist-trend {
+  font-size: 12px; font-family: var(--font-mono); font-weight: 600;
+  padding: 2px 8px; border-radius: 99px;
+}
+.hist-trend.up   { background: rgba(52,199,89,.15);  color: #1a8a4a; }
+.hist-trend.down { background: rgba(255,59,92,.12);  color: #c0392b; }
+.hist-trend.flat { background: var(--surface-2);      color: var(--muted); }
+
+.hist-card-stats {
+  display: flex; gap: 20px; flex-wrap: wrap;
+}
+.hist-stat { display: flex; flex-direction: column; }
+.hist-stat-val { font-size: 14px; font-weight: 600; color: var(--text); }
+.hist-stat-key { font-size: 10px; color: var(--dim); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; }
+
+.hist-streak {
+  font-size: 11px; font-family: var(--font-mono); color: var(--muted);
+  margin-top: 6px; display: flex; align-items: center; gap: 5px;
+}
+.hist-streak-fire { font-size: 14px; }
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+.hist-chart-outer { position: relative; }
+.hist-chart-outer canvas { display: block; width: 100%; cursor: crosshair; }
+.hist-tip {
+  position: absolute; pointer-events: none; display: none;
+  background: rgba(17,17,17,.9); color: #fff;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
+  padding: 6px 11px; border-radius: 7px; white-space: nowrap;
+  transform: translate(-50%, -110%); z-index: 10;
+}
+.hist-xaxis {
+  position: relative; height: 18px; margin-top: 3px;
+  font-family: var(--font-mono); font-size: 9px; color: var(--dim);
+}
+.hist-xaxis span { position: absolute; transform: translateX(-50%); }
+
+/* Legend */
+.hist-legend {
+  display: flex; gap: 14px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.hist-legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+}
+.hist-legend-line {
+  width: 20px; height: 2px; border-radius: 1px;
+}
+.hist-legend-band {
+  width: 20px; height: 8px; border-radius: 2px; opacity: .4;
+}
+
+.hist-loading {
+  text-align: center; padding: 60px 20px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-header">
+  <h2 class="hist-title">Histórico de salud</h2>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="period-tabs">
+      <button class="period-tab active" data-period="week">7 días</button>
+      <button class="period-tab" data-period="month">30 días</button>
+      <button class="period-tab" data-period="year">1 año</button>
+      <button class="period-tab" data-period="all">Todo</button>
+    </div>
+    <button class="pdf-export-btn" id="hist-pdf-btn" onclick="exportHistPDF()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      PDF
+    </button>
+  </div>
+</div>
+<div id="hist-content"><div class="hist-loading">Cargando…</div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Formato de fecha ──────────────────────────────────────────────────────────
+const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  // YYYY-MM-DD
+  if (parts.length >= 3) {
+    const d = parseInt(parts[2]), m = parseInt(parts[1]) - 1;
+    return `${d.toString().padStart(2,'0')}-${MESES[m]||parts[1]}`;
+  }
+  if (parts.length === 2) {
+    const y = parseInt(parts[0]), n = parseInt(parts[1]);
+    // YYYY-MM (mes)
+    if (n >= 1 && n <= 12) return MESES[n-1] + "'" + String(y).slice(2);
+    // YYYY-WW (semana ISO) → calcular lunes de esa semana
+    const jan4 = new Date(y, 0, 4);
+    const dayOfWeek = jan4.getDay() || 7;
+    const weekStart = new Date(jan4);
+    weekStart.setDate(jan4.getDate() - dayOfWeek + 1 + (n-1)*7);
+    const d = weekStart.getDate(), m = weekStart.getMonth();
+    return `${d.toString().padStart(2,'0')}-${MESES[m]}`;
+  }
+  return dateStr;
+}
+
+// ── Definición de métricas ────────────────────────────────────────────────────
+const SECTIONS = [
+  { title: '🏃 Actividad', metrics: [
+    { key:'pasos',     label:'Pasos diarios',      unit:'pasos', color:'#ff3b5c', fill:'rgba(255,59,92,.12)',  fmt:v=>Math.round(v).toLocaleString('es-ES'), agg:'sum',  bars:true },
+    { key:'calorias',  label:'Calorías activas',    unit:'kcal',  color:'#ff9500', fill:'rgba(255,149,0,.12)', fmt:v=>Math.round(v).toLocaleString('es-ES'), agg:'sum',  bars:true },
+    { key:'distancia', label:'Distancia',            unit:'km',    color:'#ff6b3d', fill:'rgba(255,107,61,.12)',fmt:v=>v.toFixed(1), agg:'sum' },
+    { key:'pisos',     label:'Pisos subidos',        unit:'pisos', color:'#a78bfa', fill:'rgba(167,139,250,.12)',fmt:v=>Math.round(v), agg:'sum', bars:true },
+  ]},
+  { title: '❤️ Corazón', metrics: [
+    { key:'fc',        label:'Frecuencia cardíaca',  unit:'PPM',   color:'#ef4444', fill:'rgba(239,68,68,.12)', fmt:v=>Math.round(v), agg:'avg' },
+    { key:'fc_reposo', label:'FC en reposo',          unit:'PPM',   color:'#dc2626', fill:'rgba(220,38,38,.12)', fmt:v=>Math.round(v), agg:'avg', invert:true },
+    { key:'hrv',       label:'HRV (variabilidad)',    unit:'ms',    color:'#5b8dee', fill:'rgba(91,141,238,.12)',fmt:v=>v.toFixed(1), agg:'avg' },
+    { key:'spo2',      label:'SpO₂ (oxígeno)',        unit:'%',     color:'#06b6d4', fill:'rgba(6,182,212,.12)', fmt:v=>v.toFixed(1), agg:'avg' },
+  ]},
+  { title: '🌙 Sueño', metrics: [
+    { key:'sueno',     label:'Horas de sueño',        unit:'h',     color:'#1a3fa8', fill:'rgba(26,63,168,.15)', fmt:v=>v.toFixed(1), agg:'avg' },
+  ]},
+  { title: '⚖️ Cuerpo', metrics: [
+    { key:'peso',      label:'Peso corporal',          unit:'kg',    color:'#10b981', fill:'rgba(16,185,129,.12)',fmt:v=>v.toFixed(1), agg:'avg' },
+  ]},
+  { title: '🌿 Salud general', metrics: [
+    { key:'resp',      label:'Frec. respiratoria',     unit:'rpm',   color:'#64748b', fill:'rgba(100,116,139,.12)',fmt:v=>v.toFixed(1), agg:'avg' },
+    { key:'luz',       label:'Luz diurna',              unit:'min',   color:'#f59e0b', fill:'rgba(245,158,11,.12)',fmt:v=>Math.round(v), agg:'sum', bars:true },
+  ]},
+];
+
+let _period = 'month';
+let _data   = {};  // { metric: { current:[], previous:[] } }
+
+// ── Carga ─────────────────────────────────────────────────────────────────────
+async function loadAll(period) {
+  _period = period;
+  document.getElementById('hist-content').innerHTML = '<div class="hist-loading">Cargando datos…</div>';
+
+  const allMetrics = SECTIONS.flatMap(s => s.metrics);
+  await Promise.all(allMetrics.map(async m => {
+    try {
+      const r  = await fetch(`/api/history?metric=${m.key}&period=${period}`);
+      _data[m.key] = await r.json();
+    } catch(e) { _data[m.key] = {current:[], previous:[]}; }
+  }));
+
+  renderAll();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAll() {
+  const content = document.getElementById('hist-content');
+  content.innerHTML = '';
+
+  SECTIONS.forEach(sec => {
+    const metricsWithData = sec.metrics.filter(m => (_data[m.key]?.current||[]).length > 1);
+    if (!metricsWithData.length) return;
+
+    const secEl = document.createElement('div');
+    secEl.className = 'hist-section';
+    secEl.innerHTML = `<div class="hist-section-title">${sec.title}</div>`;
+
+    metricsWithData.forEach(m => {
+      const curr = _data[m.key]?.current || [];
+      const prev = (_period === 'all' || _period === 'year') ? [] : (_data[m.key]?.previous || []);
+      secEl.appendChild(buildCard(m, curr, prev));
+    });
+
+    content.appendChild(secEl);
+  });
+
+  if (!content.children.length) {
+    content.innerHTML = '<div class="hist-loading">Sin datos para este período.</div>';
+    return;
+  }
+
+  setTimeout(() => {
+    SECTIONS.flatMap(s => s.metrics).forEach(m => {
+      const curr = _data[m.key]?.current || [];
+      // No mostrar período anterior en vistas largas (año/todo)
+      const prev = (_period === 'all' || _period === 'year') ? [] : (_data[m.key]?.previous || []);
+      if (curr.length > 1) drawChart(m, curr, prev);
+    });
+  }, 60);
+}
+
+// ── Estadísticas ──────────────────────────────────────────────────────────────
+function percentile(arr, p) {
+  const sorted = [...arr].sort((a,b)=>a-b);
+  const idx    = (p/100) * (sorted.length-1);
+  const lo     = Math.floor(idx), hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi]-sorted[lo]) * (idx-lo);
+}
+
+function streak(data, avg, invert=false) {
+  // Días consecutivos por encima (o por debajo si invert) de la media
+  let count = 0;
+  for (let i = data.length-1; i >= 0; i--) {
+    const good = invert ? data[i].v < avg : data[i].v > avg;
+    if (good) count++; else break;
+  }
+  return count;
+}
+
+function trendPct(curr, prev) {
+  if (!prev.length) return null;
+  const avgC = curr.reduce((s,d)=>s+d.v,0)/curr.length;
+  const avgP = prev.reduce((s,d)=>s+d.v,0)/prev.length;
+  if (!avgP) return null;
+  return (avgC - avgP) / avgP * 100;
+}
+
+// ── Tarjeta ───────────────────────────────────────────────────────────────────
+function buildCard(m, curr, prev) {
+  const vals   = curr.map(d=>d.v).filter(v=>v!=null && v>0.01);
+  const latest = vals.length ? vals.at(-1) : null;
+  const avg    = vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+  const minV   = Math.min(...vals), maxV = Math.max(...vals);
+  const pct    = trendPct(curr, prev);
+  const s      = streak(curr.filter(d=>d.v!=null && d.v>0.01), avg, m.invert);
+
+  // Tendencia
+  let trendCls = 'flat', trendStr = '→ sin cambio';
+  if (pct !== null && Math.abs(pct) >= 1) {
+    const better = m.invert ? pct < 0 : pct > 0;
+    trendCls  = better ? 'up' : 'down';
+    const period_label = {week:'semana anterior',month:'mes anterior',year:'año anterior',all:'período anterior'}[_period]||'período anterior';
+    trendStr  = `${pct>0?'↑':'↓'} ${Math.abs(pct).toFixed(1)}% vs ${period_label}`;
+  }
+
+  // Racha
+  let streakHtml = '';
+  if (s >= 3) {
+    const word = m.invert ? 'por debajo de tu media' : 'superando tu media';
+    streakHtml = `<div class="hist-streak"><span class="hist-streak-fire">🔥</span>Llevas <b>${s} días</b> consecutivos ${word}</div>`;
+  }
+
+  const periodLabel = {week:'Esta semana',month:'Este mes',year:'Este año',all:'Histórico'}[_period]||'';
+
+  const card = document.createElement('div');
+  card.className = 'hist-card';
+  card.innerHTML = `
+    <div class="hist-card-top">
+      <div class="hist-card-left">
+        <div class="hist-card-label">${m.label}</div>
+        <div class="hist-card-value-row">
+          <span class="hist-card-num">${latest!==null?m.fmt(latest):'—'}</span>
+          <span class="hist-card-unit">${m.unit}</span>
+          <span class="hist-trend ${trendCls}">${trendStr}</span>
+        </div>
+        ${streakHtml}
+      </div>
+      <div class="hist-card-stats">
+        <div class="hist-stat"><span class="hist-stat-val">${m.fmt(avg)}</span><span class="hist-stat-key">Media</span></div>
+        <div class="hist-stat"><span class="hist-stat-val">${m.fmt(minV)}</span><span class="hist-stat-key">Mínimo</span></div>
+        <div class="hist-stat"><span class="hist-stat-val">${m.fmt(maxV)}</span><span class="hist-stat-key">Máximo</span></div>
+        <div class="hist-stat"><span class="hist-stat-val">${curr.length}</span><span class="hist-stat-key">Puntos</span></div>
+      </div>
+    </div>
+    <div class="hist-legend">
+      <div class="hist-legend-item"><div class="hist-legend-line" style="background:${m.color}"></div>${periodLabel}</div>
+      ${prev.length ? '<div class="hist-legend-item"><div style="width:12px;height:12px;background:#94a3b8;border-radius:2px;display:inline-block;opacity:.65;margin-right:1px"></div>Período anterior</div>' : ''}
+    </div>
+    <div class="hist-chart-outer">
+      <canvas id="hc-${m.key}" height="110"></canvas>
+      <div class="hist-tip" id="ht-${m.key}"></div>
+    </div>
+    <div class="hist-xaxis" id="hx-${m.key}"></div>`;
+  return card;
+}
+
+// ── Dibujar gráfica ────────────────────────────────────────────────────────────
+function drawChart(m, curr, prev) {
+  const canvas = document.getElementById('hc-' + m.key);
+  const tip    = document.getElementById('ht-' + m.key);
+  const xaxis  = document.getElementById('hx-' + m.key);
+  if (!canvas) return;
+
+  canvas.width  = canvas.parentElement.offsetWidth || 800;
+  canvas.height = 110;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+
+  const vals  = curr.map(d=>d.v).filter(v=>v!=null && v>0.01);
+  const allV  = [...vals, ...(prev||[]).map(d=>d.v).filter(v=>v!=null && v>0.01)];
+  if (!vals.length) return;
+
+  const minV  = Math.max(0, Math.min(...allV) * 0.9);
+  const maxV  = Math.max(...allV) * 1.05;
+  const rng   = maxV - minV || 1;
+  const padX  = 0, padY = 8;
+
+  const toY = v => H - padY - ((v - minV) / rng) * (H - padY*2);
+  const pts  = curr.map((d,i) => ({
+    x: padX + (i/(curr.length-1||1)) * (W-padX*2),
+    y: toY(d.v), d,
+  }));
+
+  // Percentiles para banda
+  const pct    = trendPct(curr, prev);
+  const avg  = vals.reduce((a,b)=>a+b,0)/vals.length;
+
+  const drawBase = (hovIdx = -1) => {
+    ctx.clearRect(0,0,W,H);
+
+    // Línea de media
+    const avgY = toY(avg);
+    ctx.beginPath(); ctx.moveTo(0,avgY); ctx.lineTo(W,avgY);
+    ctx.strokeStyle='rgba(0,0,0,0.07)'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Calcular ancho de barra — misma lógica para curr y prev
+    const n  = curr.length;
+    const slot = W / (n || 1);          // píxeles por slot
+    const bw   = Math.max(3, slot * 0.55); // barra actual: 55% del slot
+    const pbw  = Math.max(2, slot * 0.35); // barra anterior: 35% del slot
+
+    if (m.bars) {
+      // ── Período anterior: barra gris a la IZQUIERDA de cada slot ──────────
+      if (prev && prev.length > 0) {
+        prev.forEach((d,i) => {
+          if (!d.v || d.v <= 0.01 || i >= n) return;
+          const cx  = slot * (i + 0.5);          // centro del slot
+          const x   = cx - bw/2 - pbw - 1;       // izquierda de la barra gris
+          const yv  = toY(Math.min(d.v, maxV*1.05));
+          const bh  = Math.max(2, H - padY - yv);
+          ctx.fillStyle='#94a3b8'; ctx.globalAlpha=0.55;
+          ctx.beginPath();
+          if(ctx.roundRect) ctx.roundRect(x, yv, pbw, bh, 2);
+          else ctx.rect(x, yv, pbw, bh);
+          ctx.fill(); ctx.globalAlpha=1;
+        });
+      }
+      // ── Período actual: barra de color a la DERECHA ───────────────────────
+      curr.forEach((d,i) => {
+        if (!d.v || d.v <= 0.01) return;
+        const cx  = slot * (i + 0.5);
+        const x   = cx - bw/2;
+        const yv  = pts[i].y;
+        const bh  = Math.max(2, H - padY - yv);
+        const al  = i === hovIdx ? 1 : 0.82;
+        ctx.fillStyle=m.color; ctx.globalAlpha=al;
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(x, yv, bw, bh, 3);
+        else ctx.rect(x, yv, bw, bh);
+        ctx.fill(); ctx.globalAlpha=1;
+      });
+    } else {
+      // ── Período anterior: línea gris discontinua ──────────────────────────
+      if (prev && prev.length > 1) {
+        ctx.beginPath(); let pvDraw=false;
+        prev.forEach((d,i) => {
+          if(!d.v||d.v<=0.01||i>=n){pvDraw=false;return;}
+          const x = padX+(i/(n-1||1))*(W-padX*2);
+          const y = toY(Math.min(d.v, maxV*1.05));
+          if(!pvDraw){ctx.moveTo(x,y);pvDraw=true;}else ctx.lineTo(x,y);
+        });
+        ctx.strokeStyle='#94a3b8'; ctx.globalAlpha=.6; ctx.lineWidth=2;
+        ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      }
+      // ── Período actual: línea con área ────────────────────────────────────
+      const grad=ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,m.fill); grad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.beginPath(); ctx.moveTo(pts[0].x,H); ctx.lineTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++){
+        const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;
+        ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);
+      }
+      ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();
+      ctx.fillStyle=grad;ctx.fill();
+      ctx.beginPath();let drawing=false;
+      for(let i=0;i<pts.length;i++){
+        if(!curr[i].v||curr[i].v<=0.01){drawing=false;continue;}
+        if(!drawing){ctx.moveTo(pts[i].x,pts[i].y);drawing=true;}
+        else{const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;
+          ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+      }
+      ctx.strokeStyle=m.color;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+    }
+
+    // Dot hover (solo línea)
+    if (!m.bars && hovIdx>=0 && hovIdx<pts.length && curr[hovIdx].v>0.01) {
+      const hp=pts[hovIdx];
+      ctx.beginPath();ctx.arc(hp.x,hp.y,5,0,Math.PI*2);ctx.fillStyle=m.color;ctx.fill();
+      ctx.beginPath();ctx.arc(hp.x,hp.y,9,0,Math.PI*2);ctx.strokeStyle=m.color;ctx.lineWidth=1.5;ctx.globalAlpha=.25;ctx.stroke();ctx.globalAlpha=1;
+      ctx.beginPath();ctx.moveTo(hp.x,0);ctx.lineTo(hp.x,H);ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+    }
+  };
+  drawBase();
+
+  // Eje X
+  if (xaxis) {
+    const step = Math.max(1, Math.floor(pts.length / 8));
+    xaxis.innerHTML = pts.map((p,i) => {
+      if (i%step!==0 && i!==pts.length-1) return '';
+      return `<span style="left:${(p.x/W*100).toFixed(1)}%">${fmtDate(p.d.date)}</span>`;
+    }).join('');
+  }
+
+  // Hover
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const scX  = canvas.width / rect.width;
+    const mx   = (e.clientX - rect.left) * scX;
+    const n2   = curr.length;
+    let best   = m.bars
+      ? Math.min(n2-1, Math.max(0, Math.floor(mx / (canvas.width / n2))))
+      : (() => { let b=0,bd=Infinity; pts.forEach((p,i)=>{const d=Math.abs(p.x-mx);if(d<bd){bd=d;b=i;}}); return b; })();
+    drawBase(best);
+    const hp = pts[best];
+    const pvIdx  = prev ? Math.min(best, prev.length-1) : -1;
+    const pvPoint = pvIdx >= 0 && prev[pvIdx]?.v > 0.01 ? prev[pvIdx] : null;
+    const diff    = pvPoint ? curr[best].v - pvPoint.v : null;
+    const prevVal = pvPoint
+      ? `<br><span style="opacity:.65">Anterior: ${m.fmt(pvPoint.v)} ${m.unit}` +
+        (diff !== null ? ` (${diff>0?'+':''}${m.fmt(diff)})` : '') + '</span>'
+      : '';
+    // Indicar si está dentro de zona normal
+    const zoneStr = '';
+    if (tip) {
+      tip.innerHTML = `<b>${fmtDate(hp.d.date)}</b><br>${m.fmt(hp.d.v)} ${m.unit}${zoneStr}${prevVal}`;
+      tip.style.display = 'block';
+      tip.style.left    = (e.clientX - rect.left) + 'px';
+      tip.style.top     = (hp.y / H * rect.height) + 'px';
+    }
+  };
+  canvas.onmouseleave = () => { if(tip) tip.style.display='none'; drawBase(); };
+
+  canvas._redraw = () => drawChart(m, curr, prev);
+}
+
+window.addEventListener('resize', () => {
+  SECTIONS.flatMap(s=>s.metrics).forEach(m => {
+    const curr = _data[m.key]?.current||[];
+    const prev = _data[m.key]?.previous||[];
+    if (curr.length>1) drawChart(m,curr,prev);
+  });
+});
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.period-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    loadAll(btn.dataset.period);
+  });
+});
+
+loadAll('week');
+
+// ── Exportar histórico a PDF ───────────────────────────────────────────────────
+async function exportHistPDF() {
+  const btn = document.getElementById('hist-pdf-btn');
+  if (btn) { btn.textContent = 'Generando…'; btn.disabled = true; }
+
+  if (!window.jspdf) {
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    });
+  }
+
+  const {jsPDF} = window.jspdf;
+  const pdf  = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+  const PW   = 267, ML = 10;
+  let y = 0;
+
+  // Cabecera
+  const periodLabel = {week:'Últimos 7 días',month:'Últimos 30 días',year:'Último año',all:'Histórico completo'}[_period]||_period;
+  pdf.setFillColor(17,17,17); pdf.rect(0,0,287,18,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(255,255,255);
+  pdf.text('Histórico de salud — '+periodLabel, ML, 9);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(180,180,180);
+  const today = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+  pdf.text('Generado el '+today, ML, 14);
+  y = 22;
+
+  // Para cada sección con datos
+  for (const sec of SECTIONS) {
+    const metricsWithData = sec.metrics.filter(m => (_data[m.key]?.current||[]).length > 1);
+    if (!metricsWithData.length) continue;
+
+    // Título sección
+    pdf.setFillColor(240,240,240); pdf.rect(ML,y,PW,6,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(60,60,60);
+    pdf.text(sec.title.replace(/[^\w\s]/g,'').trim().toUpperCase(), ML+2, y+4.2);
+    y += 8;
+
+    for (const m of metricsWithData) {
+      const curr = _data[m.key]?.current||[];
+      const vals = curr.map(d=>d.v).filter(v=>v>0.01);
+      if (!vals.length) continue;
+
+      const avg  = vals.reduce((a,b)=>a+b,0)/vals.length;
+      const minV = Math.min(...vals), maxV = Math.max(...vals);
+      const latest = vals.at(-1);
+      const pct  = trendPct(curr, _data[m.key]?.previous||[]);
+
+      // Línea de stats
+      if (y > 185) { pdf.addPage(); y = 12; }
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(20,20,20);
+      pdf.text(m.label, ML, y);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(80,80,80);
+      pdf.text(`Último: ${m.fmt(latest)} ${m.unit}`, ML+55, y);
+      pdf.text(`Media: ${m.fmt(avg)} ${m.unit}`, ML+95, y);
+      pdf.text(`Mín: ${m.fmt(minV)}  Máx: ${m.fmt(maxV)}`, ML+135, y);
+      if (pct !== null) {
+        const sign = pct > 0 ? '+' : '';
+        pdf.setTextColor(pct>0?20:180, pct>0?140:30, pct>0?60:30);
+        pdf.text(`${sign}${pct.toFixed(1)}% vs período anterior`, ML+185, y);
+        pdf.setTextColor(80,80,80);
+      }
+      y += 5;
+
+      // Canvas de la gráfica
+      const canvas = document.getElementById('hc-'+m.key);
+      if (canvas && canvas.width > 0) {
+        try {
+          const img = canvas.toDataURL('image/png');
+          const imgH = 28;
+          if (y+imgH > 190) { pdf.addPage(); y=12; }
+          pdf.addImage(img,'PNG', ML, y, PW, imgH);
+          y += imgH + 4;
+        } catch(e) { y += 2; }
+      }
+      y += 3;
+    }
+    y += 3;
+  }
+
+  // Paginación
+  const pages = pdf.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    pdf.setPage(i);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(160,160,160);
+    pdf.line(ML,198,ML+PW,198);
+    pdf.text(`Health Dashboard · ${periodLabel} · Pág. ${i}/${pages}`, ML, 202);
+  }
+
+  pdf.save(`historico_salud_${_period}.pdf`);
+  if(btn){btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF';btn.disabled=false;}
+}
+</script>
+{% endblock %}

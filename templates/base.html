@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Apple Health{% endblock %} · Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="page">
+
+  <nav class="navbar">
+    <a class="navbar-logo" href="/">
+      <div class="navbar-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
+      </div>
+      <span class="navbar-brand">Health</span>
+    </a>
+
+    <div class="navbar-sep"></div>
+
+    {% block nav_links %}
+    <a class="navbar-link {% if request.endpoint == 'main.index' %}active{% endif %}" href="/">Inicio</a>
+    <a class="navbar-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}" href="/dashboard">Dashboard</a>
+    <a class="navbar-link {% if request.endpoint == 'ecg.ecg_list' %}active{% endif %}" href="/ecg">ECG</a>
+    <a class="navbar-link {% if request.endpoint == 'workout.workouts_page' %}active{% endif %}" href="/workouts">Entrenamientos</a>
+    <a class="navbar-link {% if request.endpoint == 'hist.history_page' %}active{% endif %}" href="/historico">Histórico</a>
+    {% endblock %}
+
+    <span class="navbar-date" id="nav-date"></span>
+  </nav>
+
+  <main class="main-content {% block main_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <a href="https://joseromera.es" target="_blank" rel="noopener">joseromera.es</a>
+  </footer>
+
+</div>
+
+<div id="toast"></div>
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

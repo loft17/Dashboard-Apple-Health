@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% block title %}ECG{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Lista de ECGs ────────────────────────────────────────────────────────── */
+.ecg-header-row {
+  display: flex; align-items: baseline; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+}
+.ecg-header-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+.ecg-header-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+.ecg-search-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; margin-top: 12px;
+}
+.ecg-search-row input {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px; font-family: var(--font-mono);
+  background: var(--surface); color: var(--text); outline: none;
+  transition: border-color .15s;
+}
+.ecg-search-row input:focus { border-color: var(--text); }
+.ecg-search-row input[type="text"]  { flex: 1; min-width: 160px; }
+.ecg-search-row input[type="date"]  { width: 150px; }
+.ecg-search-clear {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; font-size: 12px; font-family: var(--font-mono); color: var(--muted);
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.ecg-search-clear:hover { border-color: var(--text); color: var(--text); }
+
+.ecg-list { display: flex; flex-direction: column; gap: 2px; }
+
+.ecg-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 10px; cursor: pointer;
+  border: 1px solid transparent; background: var(--surface);
+  transition: background .12s, border-color .12s;
+}
+.ecg-item:hover { background: var(--surface-2); border-color: var(--border); }
+
+.ecg-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-sinusal  { background: #34c759; }
+.dot-other    { background: #ff9500; }
+
+.ecg-item-info { flex: 1; min-width: 0; }
+.ecg-item-date { font-size: 13px; font-weight: 600; color: var(--text); }
+.ecg-item-sub  { font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 1px; }
+
+.ecg-item-badge {
+  font-size: 10px; font-family: var(--font-mono); font-weight: 500;
+  padding: 2px 8px; border-radius: 99px; white-space: nowrap; flex-shrink: 0;
+}
+.badge-sinusal { background: #e6f5ed; color: #1a8a4a; }
+.badge-other   { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+
+
+.ecg-pagination {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+}
+.ecg-page-btn {
+  height: 28px; padding: 0 12px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--surface); cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted); transition: all .15s;
+}
+.ecg-page-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+.ecg-page-btn:disabled { opacity: .3; cursor: default; }
+
+.ecg-no-results {
+  padding: 40px; text-align: center;
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.ecg-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.ecg-modal-backdrop.open { display: flex; animation: fadeIn .2s ease; }
+
+.ecg-modal {
+  background: var(--surface); border-radius: 16px;
+  width: 100%; max-width: 900px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.35);
+  animation: slideUp .25s ease;
+  overflow: hidden;
+}
+
+/* Cabecera del modal */
+.ecg-modal-header {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.ecg-modal-meta {
+  display: flex; align-items: stretch; flex: 1;
+}
+.ecg-modal-meta-item {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 12px 18px; border-right: 1px solid var(--border);
+}
+.ecg-modal-key { font-family: var(--font-mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.ecg-modal-val { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.ecg-modal-badge { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.ecg-modal-dot   { width: 7px; height: 7px; border-radius: 50%; }
+
+.ecg-modal-actions {
+  display: flex; align-items: center; gap: 6px; padding: 0 14px; flex-shrink: 0;
+}
+.ecg-action-btn {
+  height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer; font-size: 12px; font-family: var(--font-mono);
+  color: var(--muted); transition: all .15s; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.ecg-action-btn:hover { border-color: var(--text); color: var(--text); }
+.ecg-close-btn {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer; font-size: 16px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.ecg-close-btn:hover { border-color: var(--text); color: var(--text); }
+
+/* Canvas dentro del modal */
+.ecg-modal-canvas-wrap {
+  flex: 1; position: relative; overflow: hidden; min-height: 240px;
+}
+.ecg-modal-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-color: #fff;
+  background-image:
+    linear-gradient(rgba(220,160,160,.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220,160,160,.25) 1px, transparent 1px),
+    linear-gradient(rgba(220,160,160,.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220,160,160,.1) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+}
+#ecg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+.ecg-cursor-tip {
+  position: absolute; top: 8px; right: 10px; pointer-events: none; display: none;
+  background: rgba(17,17,17,.85); color: #fff;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 10px; border-radius: 6px;
+}
+
+/* Barra inferior */
+.ecg-modal-footer {
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 16px; border-top: 1px solid var(--border);
+  flex-shrink: 0; background: var(--surface);
+}
+.ecg-hint  { font-family: var(--font-mono); font-size: 10px; color: var(--dim); }
+.ecg-scale { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-left: auto; }
+
+@keyframes fadeIn  { from { opacity: 0; }             to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if not ecgs %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;gap:12px">
+  <div style="font-size:40px;opacity:.25">📈</div>
+  <div style="font-size:14px;color:var(--muted)">No se encontraron ECGs en el export.zip</div>
+</div>
+{% else %}
+
+<div class="ecg-header-row">
+  <h2 class="ecg-header-title">Electrocardiogramas</h2>
+  <span class="ecg-header-count" id="ecg-count-label"></span>
+</div>
+
+<div class="ecg-search-row">
+  <input type="text" id="ecg-text-filter" placeholder="Buscar por fecha (2026-04), clasificación…" autocomplete="off" style="flex:1">
+  <button class="ecg-search-clear" onclick="clearFilters()">✕ Limpiar</button>
+</div>
+
+<div class="ecg-list" id="ecg-list-body"></div>
+<div class="ecg-no-results" id="ecg-no-results" style="display:none">Sin resultados</div>
+
+<div class="ecg-pagination" id="ecg-pagination" style="display:none">
+  <button class="ecg-page-btn" id="btn-prev" onclick="changePage(-1)">← Anterior</button>
+  <span id="page-info"></span>
+  <button class="ecg-page-btn" id="btn-next" onclick="changePage(1)">Siguiente →</button>
+</div>
+
+{% endif %}
+
+{# ── Modal ── #}
+<div class="ecg-modal-backdrop" id="ecg-modal" onclick="closeModal(event)">
+  <div class="ecg-modal" id="ecg-modal-inner">
+
+    <div class="ecg-modal-header">
+      <div class="ecg-modal-meta">
+        <div class="ecg-modal-meta-item">
+          <span class="ecg-modal-key">Clasificación</span>
+          <div class="ecg-modal-badge">
+            <span class="ecg-modal-dot" id="m-dot" style="background:#ccc"></span>
+            <span class="ecg-modal-val" id="m-clas">—</span>
+          </div>
+        </div>
+        <div class="ecg-modal-meta-item">
+          <span class="ecg-modal-key">Fecha y hora</span>
+          <span class="ecg-modal-val" id="m-fecha">—</span>
+        </div>
+        <div class="ecg-modal-meta-item">
+          <span class="ecg-modal-key">Duración</span>
+          <span class="ecg-modal-val" id="m-dur">—</span>
+        </div>
+        <div class="ecg-modal-meta-item">
+          <span class="ecg-modal-key">Síntomas</span>
+          <span class="ecg-modal-val" id="m-sint">—</span>
+        </div>
+      </div>
+      <div class="ecg-modal-actions">
+        <button class="ecg-action-btn" onclick="zoomIn()"  title="Ampliar">＋</button>
+        <button class="ecg-action-btn" onclick="zoomOut()" title="Reducir">－</button>
+        <button class="ecg-action-btn" onclick="resetView()">↺ Reset</button>
+        <button class="ecg-action-btn" onclick="exportPNG()" title="Exportar imagen">🖼 PNG</button>
+        <button class="ecg-action-btn" onclick="exportPDF()" title="Exportar PDF">📄 PDF</button>
+        <button class="ecg-close-btn"  onclick="closeModalDirect()">✕</button>
+      </div>
+    </div>
+
+    <div class="ecg-modal-canvas-wrap" id="ecg-wrap">
+      <div class="ecg-modal-grid"></div>
+      <canvas id="ecg-canvas"></canvas>
+      <div class="ecg-cursor-tip" id="ecg-cursor"></div>
+    </div>
+
+    <div class="ecg-modal-footer">
+      <span class="ecg-hint">🖱 Arrastra · Rueda = zoom</span>
+      <span class="ecg-scale" id="ecg-scale"></span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+{% if ecgs %}
+const ALL_ECGS = {{ ecgs | tojson }};
+ALL_ECGS.sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+const PAGE_SIZE = 100;
+let _filtered = [...ALL_ECGS], _page = 0;
+
+// ── Lista ─────────────────────────────────────────────────────────────────────
+function renderList() {
+  const body = document.getElementById('ecg-list-body');
+  const start = _page * PAGE_SIZE;
+  const slice = _filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('ecg-no-results').style.display = slice.length ? 'none' : 'block';
+
+  body.innerHTML = slice.map(ecg => {
+    const sin = (ecg.clasificacion||'').toLowerCase().includes('sinusal');
+    return `<div class="ecg-item" onclick="openModal('${ecg.filename}')">
+      <div class="ecg-item-dot ${sin?'dot-sinusal':'dot-other'}"></div>
+      <div class="ecg-item-info">
+        <div class="ecg-item-date">${ecg.fecha_iso} &middot; ${ecg.hora}</div>
+        <div class="ecg-item-sub">${ecg.duration_s}s &middot; ${ecg.n_samples} muestras &middot; ${ecg.dispositivo}</div>
+      </div>
+      <span class="ecg-item-badge ${sin?'badge-sinusal':'badge-other'}">${ecg.clasificacion||'—'}</span>
+    </div>`;
+  }).join('');
+
+  const total = _filtered.length, pages = Math.ceil(total/PAGE_SIZE);
+  document.getElementById('ecg-count-label').textContent =
+    total === ALL_ECGS.length ? `${total} registros` : `${total} de ${ALL_ECGS.length}`;
+
+  const pag = document.getElementById('ecg-pagination');
+  pag.style.display = pages > 1 ? 'flex' : 'none';
+  document.getElementById('page-info').textContent = `Página ${_page+1} de ${pages}`;
+  document.getElementById('btn-prev').disabled = _page === 0;
+  document.getElementById('btn-next').disabled = _page >= pages-1;
+}
+
+function changePage(d) {
+  _page = Math.max(0, Math.min(_page+d, Math.ceil(_filtered.length/PAGE_SIZE)-1));
+  renderList();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
+const tf = document.getElementById('ecg-text-filter');
+
+function applyFilters() {
+  const tv = (tf?.value||'').trim().toLowerCase();
+  _filtered = ALL_ECGS.filter(e =>
+    !tv ||
+    (e.clasificacion||'').toLowerCase().includes(tv) ||
+    e.fecha_iso.includes(tv) ||
+    e.hora.includes(tv)
+  );
+  _page = 0; renderList();
+}
+function clearFilters() { if(tf) tf.value=''; applyFilters(); }
+tf?.addEventListener('input', applyFilters);
+
+// Renderizado inicial
+renderList();
+{% endif %}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+let _samples=[], _sr=512, _viewStart=0, _zoom=1;
+let _drag=false, _dragX=0, _dragV=0;
+let _currentMeta={};
+
+const canvas = document.getElementById('ecg-canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('ecg-wrap');
+
+function resizeCanvas() {
+  canvas.width  = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+  if (_samples.length) drawECG();
+}
+
+async function openModal(filename) {
+  document.getElementById('ecg-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  _viewStart=0; _zoom=1;
+
+  // Reset display
+  ['m-clas','m-fecha','m-dur','m-sint'].forEach(id =>
+    document.getElementById(id).textContent = '…');
+
+  setTimeout(resizeCanvas, 50);
+
+  try {
+    const res  = await fetch('/api/ecg/file/' + encodeURIComponent(filename));
+    const data = await res.json();
+    if (data.error) return;
+
+    _samples = data.samples; _sr = data.meta.sample_rate;
+    _currentMeta = data.meta;
+
+    const sin = (data.meta.clasificacion||'').toLowerCase().includes('sinusal');
+    document.getElementById('m-clas').textContent  = data.meta.clasificacion || '—';
+    document.getElementById('m-dot').style.background = sin ? '#34c759' : '#ff9500';
+    document.getElementById('m-fecha').textContent = data.meta.fecha_iso + ' · ' + data.meta.hora;
+    document.getElementById('m-dur').textContent   = data.meta.duration_s + ' s';
+    document.getElementById('m-sint').textContent  = data.meta.sintomas || 'Ninguno';
+
+    resizeCanvas(); drawECG();
+  } catch(e) { console.error(e); }
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('ecg-modal')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('ecg-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModalDirect(); });
+
+// ── Dibujo ────────────────────────────────────────────────────────────────────
+function drawECG() {
+  if (!_samples.length) return;
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const vis   = Math.floor(_samples.length / _zoom);
+  const start = Math.max(0, Math.min(_viewStart, _samples.length-vis));
+  const win   = _samples.slice(start, start+vis);
+
+  const mid = win.reduce((a,b)=>a+b,0)/win.length;
+  const amp = Math.max(...win.map(v=>Math.abs(v-mid)))||1;
+  const scY = (H/2-16)/amp;
+
+  // Línea base
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2);
+  ctx.strokeStyle='rgba(200,150,150,.3)'; ctx.lineWidth=1;
+  ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Traza
+  ctx.beginPath(); ctx.strokeStyle='#c8000a'; ctx.lineWidth=1.8;
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  for (let i=0;i<win.length;i++) {
+    const x=(i/(win.length-1))*W;
+    const y=H/2-(win[i]-mid)*scY;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  const s0=(start/_sr).toFixed(1), s1=((start+vis)/_sr).toFixed(1);
+  document.getElementById('ecg-scale').textContent=`${s0}s – ${s1}s · ×${_zoom.toFixed(1)}`;
+}
+
+// ── Controles ─────────────────────────────────────────────────────────────────
+function zoomIn()    { _zoom=Math.min(_zoom*2,64); clamp(); drawECG(); }
+function zoomOut()   { _zoom=Math.max(_zoom/2,1);  clamp(); drawECG(); }
+function resetView() { _zoom=1; _viewStart=0; drawECG(); }
+function clamp() {
+  const vis=Math.floor(_samples.length/_zoom);
+  _viewStart=Math.max(0,Math.min(_viewStart,_samples.length-vis));
+}
+
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); e.deltaY<0?zoomIn():zoomOut(); },{passive:false});
+canvas.addEventListener('mousedown', e=>{_drag=true;_dragX=e.clientX;_dragV=_viewStart;canvas.style.cursor='grabbing';});
+window.addEventListener('mousemove', e=>{
+  if(!_drag||!_samples.length) return;
+  const vis=Math.floor(_samples.length/_zoom);
+  _viewStart=Math.max(0,Math.min(_dragV+Math.round(-(e.clientX-_dragX)/canvas.width*vis),_samples.length-vis));
+  drawECG();
+});
+window.addEventListener('mouseup',()=>{_drag=false;canvas.style.cursor='crosshair';});
+canvas.addEventListener('mousemove',e=>{
+  if(_drag||!_samples.length)return;
+  const rect=canvas.getBoundingClientRect();
+  const scX=canvas.width/rect.width;
+  const relX=(e.clientX-rect.left)*scX/canvas.width;
+  const vis=Math.floor(_samples.length/_zoom);
+  const idx=Math.round(_viewStart+relX*vis);
+  if(idx>=0&&idx<_samples.length){
+    const t=(idx/_sr).toFixed(3);
+    const tip=document.getElementById('ecg-cursor');
+    tip.textContent=`${t}s  ${_samples[idx].toFixed(1)} µV`;
+    tip.style.display='block';
+  }
+});
+canvas.addEventListener('mouseleave',()=>{document.getElementById('ecg-cursor').style.display='none';});
+window.addEventListener('resize', resizeCanvas);
+
+// ── Exportar PNG ──────────────────────────────────────────────────────────────
+function exportPNG() {
+  if (!_samples.length) return;
+
+  // Crear canvas de exportación con fondo blanco + cuadrícula + traza
+  const expW = 1200, expH = 400;
+  const exp  = document.createElement('canvas');
+  exp.width  = expW; exp.height = expH;
+  const ec   = exp.getContext('2d');
+
+  // Fondo blanco
+  ec.fillStyle = '#fff'; ec.fillRect(0,0,expW,expH);
+
+  // Cuadrícula ECG
+  const drawGrid = (ctx, W, H) => {
+    ctx.strokeStyle='rgba(220,160,160,.4)'; ctx.lineWidth=1;
+    for(let x=0;x<=W;x+=50){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+    for(let y=0;y<=H;y+=50){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+    ctx.strokeStyle='rgba(220,160,160,.15)'; ctx.lineWidth=0.5;
+    for(let x=0;x<=W;x+=10){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+    for(let y=0;y<=H;y+=10){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  };
+  drawGrid(ec, expW, expH);
+
+  // Traza
+  const vis   = Math.floor(_samples.length/_zoom);
+  const start = Math.max(0,Math.min(_viewStart,_samples.length-vis));
+  const win   = _samples.slice(start, start+vis);
+  const mid   = win.reduce((a,b)=>a+b,0)/win.length;
+  const amp   = Math.max(...win.map(v=>Math.abs(v-mid)))||1;
+  const scY   = (expH/2-30)/amp;
+
+  ec.beginPath(); ec.strokeStyle='#c8000a'; ec.lineWidth=2;
+  ec.lineJoin='round'; ec.lineCap='round';
+  win.forEach((v,i)=>{
+    const x=(i/(win.length-1))*expW;
+    const y=expH/2-(v-mid)*scY;
+    i===0?ec.moveTo(x,y):ec.lineTo(x,y);
+  });
+  ec.stroke();
+
+  // Metadatos en la imagen
+  ec.fillStyle='#333'; ec.font='bold 13px monospace';
+  const meta = _currentMeta;
+  ec.fillText(`${meta.fecha_iso} ${meta.hora}  ·  ${meta.clasificacion}  ·  ${meta.duration_s}s  ·  ${_sr}Hz`, 12, expH-10);
+
+  // Descargar
+  const link = document.createElement('a');
+  link.download = `ecg_${meta.fecha_iso}_${meta.hora.replace(':','')}.png`;
+  link.href = exp.toDataURL('image/png');
+  link.click();
+}
+
+// ── Exportar PDF ──────────────────────────────────────────────────────────────
+async function exportPDF() {
+  if (!_samples.length) return;
+
+  // Cargar jsPDF dinámicamente
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdf  = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const pW   = 277, pH = 190;  // A4 landscape útil
+
+  // Metadatos
+  const meta = _currentMeta;
+  pdf.setFont('courier','normal');
+  pdf.setFontSize(14); pdf.setTextColor(30,30,30);
+  pdf.text('Electrocardiograma', 14, 14);
+  pdf.setFontSize(10); pdf.setTextColor(80,80,80);
+  pdf.text(`Fecha: ${meta.fecha_iso}  Hora: ${meta.hora}`, 14, 22);
+  pdf.text(`Clasificación: ${meta.clasificacion}  ·  Duración: ${meta.duration_s}s  ·  ${_sr} Hz`, 14, 28);
+  pdf.text(`Síntomas: ${meta.sintomas||'Ninguno'}  ·  Dispositivo: ${meta.dispositivo}`, 14, 34);
+
+  // Cuadrícula
+  pdf.setDrawColor(220,170,170); pdf.setLineWidth(0.3);
+  const gX=14, gY=40, gW=pW, gH=pH-40;
+  for(let x=gX;x<=gX+gW;x+=10){ pdf.line(x,gY,x,gY+gH); }
+  for(let y=gY;y<=gY+gH;y+=10){ pdf.line(gX,y,gX+gW,y); }
+  pdf.setDrawColor(200,140,140); pdf.setLineWidth(0.5);
+  for(let x=gX;x<=gX+gW;x+=50){ pdf.line(x,gY,x,gY+gH); }
+  for(let y=gY;y<=gY+gH;y+=50){ pdf.line(gX,y,gX+gW,y); }
+
+  // Traza
+  const vis   = Math.floor(_samples.length/_zoom);
+  const start = Math.max(0,Math.min(_viewStart,_samples.length-vis));
+  const win   = _samples.slice(start,start+vis);
+  const mid   = win.reduce((a,b)=>a+b,0)/win.length;
+  const amp   = Math.max(...win.map(v=>Math.abs(v-mid)))||1;
+  const scY   = (gH/2-4)/amp;
+
+  pdf.setDrawColor(200,0,10); pdf.setLineWidth(0.5);
+  for (let i=1;i<win.length;i++) {
+    const x1=gX+(i-1)/(win.length-1)*gW;
+    const y1=gY+gH/2-(win[i-1]-mid)*scY;
+    const x2=gX+i/(win.length-1)*gW;
+    const y2=gY+gH/2-(win[i]-mid)*scY;
+    pdf.line(x1,y1,x2,y2);
+  }
+
+  pdf.save(`ecg_${meta.fecha_iso}_${meta.hora.replace(':','')}.pdf`);
+}
+</script>
+
+{% endblock %}

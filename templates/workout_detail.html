@@ -1,0 +1,849 @@
+{% extends "base.html" %}
+{% block title %}{{ workout.name }} · {{ workout.date }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+.wkd-page { display: flex; flex-direction: column; gap: 20px; }
+
+.wkd-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.wkd-back {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer; font-family: var(--font-mono); font-size: 12px;
+  color: var(--muted); text-decoration: none; display: flex; align-items: center; gap: 5px;
+  transition: all .15s;
+}
+.wkd-back:hover { border-color: var(--text); color: var(--text); }
+.wkd-title-block { flex: 1; }
+.wkd-title    { font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
+.wkd-subtitle { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+/* Stats */
+.wkd-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.wkd-stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.wkd-stat-val  { font-size: 1.5rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
+.wkd-stat-unit { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.wkd-stat-key  { font-size: 10px; color: var(--dim); font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+.wkd-stat-extra { font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-top: 4px; line-height: 1.4; }
+
+/* Mapa */
+.wkd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.wkd-card-header {
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.wkd-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* Controles del mapa */
+.map-layer-btns { display: flex; gap: 4px; }
+.map-layer-btn {
+  height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: none; font-size: 11px; font-family: var(--font-mono); color: var(--muted);
+  cursor: pointer; transition: all .12s;
+}
+.map-layer-btn:hover  { border-color: var(--text); color: var(--text); }
+.map-layer-btn.active { border-color: var(--text); color: var(--text); background: var(--surface-2); }
+
+#wkd-map { width: 100%; height: 460px; }
+
+.wkd-map-footer {
+  padding: 9px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.wkd-mf-stat  { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.wkd-mf-stat strong { color: var(--text); }
+.wkd-legend   { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.wkd-leg-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+.wkd-leg-dot  { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+
+/* Gráficas */
+.wkd-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .wkd-charts { grid-template-columns: 1fr; } }
+
+.wkd-chart-wrap { position: relative; padding: 6px 12px 12px; }
+canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair; }
+
+.wkd-chart-tooltip {
+  position: absolute; pointer-events: none; display: none;
+  background: rgba(17,17,17,.88); color: #fff;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+  transform: translate(-50%, -110%);
+}
+.wkd-cursor-line {
+  position: absolute; top: 6px; bottom: 12px; width: 1px;
+  background: rgba(0,0,0,.15); pointer-events: none; display: none;
+}
+
+/* Zonas FC */
+.hr-zones-wrap { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.hr-zone-row { display: flex; align-items: center; gap: 10px; }
+.hr-zone-label { font-size: 11px; font-family: var(--font-mono); color: var(--text); width: 110px; flex-shrink: 0; }
+.hr-zone-bar-track { flex: 1; height: 10px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.hr-zone-bar-fill  { height: 100%; border-radius: 99px; transition: width 1s ease; }
+.hr-zone-time { font-size: 11px; font-family: var(--font-mono); color: var(--muted); width: 50px; text-align: right; flex-shrink: 0; }
+
+/* Splits */
+.splits-table { width: 100%; border-collapse: collapse; }
+.splits-table th { font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 8px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+.splits-table td { font-size: 12px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); color: var(--text); }
+.splits-table tr:last-child td { border-bottom: none; }
+.splits-table tr:hover td { background: var(--surface-2); }
+.split-bar { display: inline-block; height: 6px; background: #5b8dee; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+.split-best { color: #34c759; font-weight: 700; }
+
+/* Sin ruta */
+.wkd-no-route {
+  height: 240px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; color: var(--muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wkd-page">
+
+  <div class="wkd-header">
+    <a class="wkd-back" href="/workouts">← Entrenamientos</a>
+    <div class="wkd-title-block">
+      <div class="wkd-title">{{ workout.icon }} {{ workout.name }}</div>
+      <div class="wkd-subtitle">{{ workout.date }} · {{ workout.time }} · {{ workout.source }}</div>
+    </div>
+  </div>
+
+  <div class="wkd-stats">
+    <div class="wkd-stat-card">
+      <div class="wkd-stat-val">{{ workout.duration_fmt }}</div>
+      <div class="wkd-stat-key">Duración</div>
+    </div>
+    {% if workout.dist_km > 0 %}
+    <div class="wkd-stat-card">
+      <div class="wkd-stat-val">{{ workout.dist_km }}<span class="wkd-stat-unit"> km</span></div>
+      <div class="wkd-stat-key">Distancia</div>
+    </div>
+    {% if workout.duration_min > 0 %}
+    <div class="wkd-stat-card">
+      <div class="wkd-stat-val">{{ "%.1f"|format(workout.dist_km / workout.duration_min * 60) }}<span class="wkd-stat-unit"> km/h</span></div>
+      <div class="wkd-stat-key">Velocidad media</div>
+    </div>
+    <div class="wkd-stat-card">
+      <div class="wkd-stat-val">{{ "%d'%02d\""|format((workout.duration_min / workout.dist_km)|int, ((workout.duration_min / workout.dist_km % 1) * 60)|int) }}</div>
+      <div class="wkd-stat-key">Ritmo /km</div>
+    </div>
+    {% endif %}
+    {% endif %}
+    {% if workout.kcal > 0 %}
+    <div class="wkd-stat-card" id="card-kcal">
+      <div class="wkd-stat-val">{{ workout.kcal }}<span class="wkd-stat-unit"> kcal</span></div>
+      <div class="wkd-stat-key">Calorías activas</div>
+      <div class="wkd-stat-extra" id="kcal-split" style="display:none"></div>
+    </div>
+    {% endif %}
+    <div class="wkd-stat-card" id="card-desnivel" style="display:none">
+      <div class="wkd-stat-val" id="val-desnivel">—</div>
+      <div class="wkd-stat-key">Desnivel positivo</div>
+    </div>
+    <div class="wkd-stat-card" id="card-cadencia" style="display:none">
+      <div class="wkd-stat-val" id="val-cadencia">—<span class="wkd-stat-unit"> ppm</span></div>
+      <div class="wkd-stat-key">Cadencia media</div>
+    </div>
+    <div class="wkd-stat-card" id="card-moving" style="display:none">
+      <div class="wkd-stat-val" id="val-moving-time">—</div>
+      <div class="wkd-stat-key">Tiempo en movimiento</div>
+      <div class="wkd-stat-extra" id="val-moving-pct"></div>
+    </div>
+    <div class="wkd-stat-card" id="card-clima" style="display:none">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span id="val-clima-icon" style="font-size:1.3rem"></span>
+        <span class="wkd-stat-val" id="val-clima-temp">—</span>
+      </div>
+      <div class="wkd-stat-key" id="val-clima-desc">Clima</div>
+      <div class="wkd-stat-extra" id="val-clima-extra"></div>
+    </div>
+  </div>
+
+  {% if workout.has_route %}
+
+  {# Mapa #}
+  <div class="wkd-card">
+    <div class="wkd-card-header">
+      <span class="wkd-card-title">Recorrido GPS</span>
+      <div class="map-layer-btns">
+        <button class="map-layer-btn active" onclick="setLayer('streets',this)">Mapa</button>
+        <button class="map-layer-btn" onclick="setLayer('satellite',this)">Satélite</button>
+        <button class="map-layer-btn" onclick="setLayer('topo',this)">Topo</button>
+      </div>
+    </div>
+    <div id="wkd-loading" style="height:100px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;color:var(--muted)">Cargando ruta…</div>
+    <div id="wkd-map" style="display:none"></div>
+    <div class="wkd-map-footer" id="wkd-footer" style="display:none">
+      <span class="wkd-mf-stat">GPS: <strong id="wkd-pts">—</strong> puntos</span>
+      <span class="wkd-mf-stat">Distancia: <strong id="wkd-dist">—</strong> km</span>
+      <span class="wkd-mf-stat">Velocidad: <strong id="wkd-spd">—</strong> · <strong id="wkd-spd-max">—</strong> km/h máx</span>
+      <span class="wkd-mf-stat">Altitud: <strong id="wkd-ele">—</strong> m</span>
+      <div class="wkd-legend">
+        <div class="wkd-leg-item"><div class="wkd-leg-dot" style="background:#34c759"></div>Inicio</div>
+        <div class="wkd-leg-item"><div class="wkd-leg-dot" style="background:#ff3b5c"></div>Fin</div>
+      </div>
+    </div>
+  </div>
+
+  {# Gráficas #}
+  <div class="wkd-charts" id="wkd-charts" style="display:none">
+
+    <div class="wkd-card">
+      <div class="wkd-card-header"><span class="wkd-card-title">Perfil de altitud</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="ele-range-label"></span></div>
+      <div class="wkd-chart-wrap">
+        <canvas class="wkd-chart" id="ele-chart"></canvas>
+        <div class="wkd-cursor-line" id="ele-cursor-line"></div>
+        <div class="wkd-chart-tooltip" id="ele-tooltip"></div>
+      </div>
+    </div>
+
+    <div class="wkd-card">
+      <div class="wkd-card-header"><span class="wkd-card-title">Velocidad</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="spd-range-label"></span></div>
+      <div class="wkd-chart-wrap">
+        <canvas class="wkd-chart" id="spd-chart"></canvas>
+        <div class="wkd-cursor-line" id="spd-cursor-line"></div>
+        <div class="wkd-chart-tooltip" id="spd-tooltip"></div>
+      </div>
+    </div>
+
+    <div class="wkd-card" id="hr-chart-card" style="display:none">
+      <div class="wkd-card-header"><span class="wkd-card-title">Frecuencia cardíaca</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="hr-range-label"></span></div>
+      <div class="wkd-chart-wrap">
+        <canvas class="wkd-chart" id="hr-chart"></canvas>
+        <div class="wkd-cursor-line" id="hr-cursor-line"></div>
+        <div class="wkd-chart-tooltip" id="hr-tooltip"></div>
+      </div>
+    </div>
+
+  </div>
+
+  {# Zonas de FC #}
+  <div class="wkd-card" id="hr-zones-card" style="display:none">
+    <div class="wkd-card-header">
+      <span class="wkd-card-title">Zonas de frecuencia cardíaca</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="hr-zones-label"></span>
+    </div>
+    <div class="hr-zones-wrap" id="hr-zones-wrap"></div>
+  </div>
+
+  {# Splits por kilómetro #}
+  <div class="wkd-card" id="splits-card" style="display:none">
+    <div class="wkd-card-header">
+      <span class="wkd-card-title">Splits por kilómetro</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="splits-label"></span>
+    </div>
+    <table class="splits-table" id="splits-table">
+      <thead><tr><th>Km</th><th>Ritmo</th><th>Velocidad</th><th>Altitud Δ</th><th></th></tr></thead>
+      <tbody id="splits-body"></tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="wkd-card">
+    <div class="wkd-no-route">
+      <div style="font-size:36px;opacity:.3">🗺️</div>
+      <div style="font-size:14px;font-weight:600">Sin ruta GPS</div>
+      <div style="font-size:12px;font-family:var(--font-mono)">Este entrenamiento no tiene fichero GPX asociado</div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if workout.has_route %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const GPX_FILE    = {{ workout.gpx_file | tojson }};
+const WK_START    = {{ workout.start    | tojson }};
+const WK_END      = {{ workout.end      | tojson }};
+const WK_DUR_MIN  = {{ workout.duration_min }};
+const WK_KCAL     = {{ workout.kcal }};
+
+// Códigos de tiempo WMO → emoji + descripción
+const WMO_CODES = {
+  0:'☀️|Despejado', 1:'🌤|Casi despejado', 2:'⛅|Parcialmente nublado', 3:'☁️|Nublado',
+  45:'🌫|Niebla', 48:'🌫|Niebla con escarcha',
+  51:'🌦|Llovizna ligera', 53:'🌦|Llovizna', 55:'🌧|Llovizna intensa',
+  61:'🌧|Lluvia ligera', 63:'🌧|Lluvia', 65:'🌧|Lluvia intensa',
+  71:'🌨|Nieve ligera', 73:'❄️|Nieve', 75:'❄️|Nieve intensa',
+  80:'🌦|Chubascos ligeros', 81:'🌧|Chubascos', 82:'⛈|Chubascos fuertes',
+  95:'⛈|Tormenta', 96:'⛈|Tormenta con granizo', 99:'⛈|Tormenta fuerte',
+};
+let _map, _tileLayer, _hoverMarker, _routeData;
+
+// ── Capas de mapa ─────────────────────────────────────────────────────────────
+const LAYERS = {
+  streets:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  topo:      'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+};
+const ATTRIBS = {
+  streets:   '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  satellite: '© Esri',
+  topo:      '© <a href="https://opentopomap.org">OpenTopoMap</a>',
+};
+
+function setLayer(name, btn) {
+  if (!_map) return;
+  document.querySelectorAll('.map-layer-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_tileLayer) _map.removeLayer(_tileLayer);
+  _tileLayer = L.tileLayer(LAYERS[name], { attribution: ATTRIBS[name], maxZoom: 19 });
+  _tileLayer.addTo(_map);
+}
+
+// ── Dibujar gráfica ───────────────────────────────────────────────────────────
+function drawChart(canvasId, data, color, fillColor, labelFn, cursorLineId, tooltipId, onHover) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  const wrap = canvas.parentElement;
+  canvas.width  = wrap.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const vals = data.map(d => d.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const pad = 10;
+
+  const pts = data.map((d, i) => ({
+    x: (i / (data.length - 1)) * (W - pad*2) + pad,
+    y: H - pad - ((d.v - minV) / range) * (H - pad*2),
+    d,
+  }));
+
+  // Fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, fillColor);
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, H);
+  ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[Math.max(i-1,0)], p1 = pts[i];
+    const p2 = pts[Math.min(i+1, pts.length-1)], pm1 = pts[Math.max(i-2,0)];
+    const t = 0.3;
+    ctx.bezierCurveTo(p0.x + (p1.x-pm1.x)*t, p0.y + (p1.y-pm1.y)*t,
+                      p1.x - (p2.x-p0.x)*t,   p1.y - (p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.lineTo(pts[pts.length-1].x, H);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[Math.max(i-1,0)], p1 = pts[i];
+    const p2 = pts[Math.min(i+1, pts.length-1)], pm1 = pts[Math.max(i-2,0)];
+    const t = 0.3;
+    ctx.bezierCurveTo(p0.x + (p1.x-pm1.x)*t, p0.y + (p1.y-pm1.y)*t,
+                      p1.x - (p2.x-p0.x)*t,   p1.y - (p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+  // Hover
+  const cursorLine = document.getElementById(cursorLineId);
+  const tooltip    = document.getElementById(tooltipId);
+
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    let best = 0, bestD = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(p.x - mx); if (d < bestD) { bestD = d; best = i; } });
+
+    const hp = pts[best];
+    // Cursor line
+    const pctX = (hp.x / W) * 100;
+    cursorLine.style.display = 'block';
+    cursorLine.style.left    = pctX + '%';
+
+    // Punto en el canvas
+    ctx.clearRect(0, 0, W, H);
+    // Redibujar (simplificado)
+    drawChartBase(ctx, pts, W, H, color, fillColor, grad, pad);
+    ctx.beginPath(); ctx.arc(hp.x, hp.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath(); ctx.arc(hp.x, hp.y, 7, 0, Math.PI*2);
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.25; ctx.stroke(); ctx.globalAlpha = 1;
+
+    // Tooltip
+    tooltip.textContent = labelFn(pts[best].d);
+    tooltip.style.display = 'block';
+    tooltip.style.left = pctX + '%';
+    tooltip.style.top  = ((hp.y / H) * 100) + '%';
+
+    if (onHover) onHover(best, pts.length);
+  };
+  canvas.onmouseleave = () => {
+    cursorLine.style.display = 'none';
+    tooltip.style.display    = 'none';
+    if (onHover) onHover(null, pts.length);
+    // Redibujar limpio
+    ctx.clearRect(0, 0, W, H);
+    drawChartBase(ctx, pts, W, H, color, fillColor, grad, pad);
+  };
+}
+
+function drawChartBase(ctx, pts, W, H, color, fillColor, grad, pad) {
+  ctx.beginPath(); ctx.moveTo(pts[0].x, H); ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[Math.max(i-1,0)], p1 = pts[i];
+    const p2 = pts[Math.min(i+1, pts.length-1)], pm1 = pts[Math.max(i-2,0)];
+    const t = 0.3;
+    ctx.bezierCurveTo(p0.x + (p1.x-pm1.x)*t, p0.y + (p1.y-pm1.y)*t,
+                      p1.x - (p2.x-p0.x)*t,   p1.y - (p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[Math.max(i-1,0)], p1 = pts[i];
+    const p2 = pts[Math.min(i+1, pts.length-1)], pm1 = pts[Math.max(i-2,0)];
+    const t = 0.3;
+    ctx.bezierCurveTo(p0.x + (p1.x-pm1.x)*t, p0.y + (p1.y-pm1.y)*t,
+                      p1.x - (p2.x-p0.x)*t,   p1.y - (p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+}
+
+// ── Marcadores por kilómetro ─────────────────────────────────────────────────
+function addKmMarkers(map, points) {
+  let distAcc = 0, nextKm = 1;
+  for (let i = 1; i < points.length; i++) {
+    const p1 = points[i-1], p2 = points[i];
+    const dlat = (p2.lat - p1.lat) * Math.PI / 180;
+    const dlon = (p2.lon - p1.lon) * Math.PI / 180;
+    const a = Math.sin(dlat/2)**2 + Math.cos(p1.lat*Math.PI/180) * Math.cos(p2.lat*Math.PI/180) * Math.sin(dlon/2)**2;
+    distAcc += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    if (distAcc >= nextKm) {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:#111;color:white;font-family:monospace;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;border:1.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);white-space:nowrap">${nextKm} km</div>`,
+        iconAnchor: [16, 8],
+      });
+      L.marker([p2.lat, p2.lon], {icon}).addTo(map);
+      nextKm++;
+    }
+  }
+}
+
+// ── Carga y renderizado ───────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res  = await fetch('/api/workouts/route?gpx=' + encodeURIComponent(GPX_FILE));
+    const data = await res.json();
+    _routeData = data;
+
+    document.getElementById('wkd-loading').style.display = 'none';
+
+    if (data.error || !data.points?.length) {
+      document.getElementById('wkd-loading').textContent = 'Sin puntos GPS';
+      return;
+    }
+
+    // ── Mapa ──────────────────────────────────────────────────────────────────
+    const mapEl = document.getElementById('wkd-map');
+    mapEl.style.display = 'block';
+
+    _map = L.map('wkd-map');
+    _tileLayer = L.tileLayer(LAYERS.streets, { attribution: ATTRIBS.streets, maxZoom: 19 });
+    _tileLayer.addTo(_map);
+
+    const pts     = data.points;
+    const latlngs = pts.map(p => [p.lat, p.lon]);
+    const speeds  = pts.map(p => p.speed || 0);
+    const sMin    = Math.min(...speeds), sMax = Math.max(...speeds), sRange = sMax - sMin || 1;
+
+    function speedColor(s) {
+      const t = (s - sMin) / sRange;
+      return `hsl(${220 - t*220}, 80%, 45%)`;
+    }
+
+    // Ruta coloreada por velocidad
+    for (let i = 1; i < latlngs.length; i++) {
+      L.polyline([latlngs[i-1], latlngs[i]], {
+        color: speedColor(speeds[i]), weight: 4, opacity: 0.85
+      }).addTo(_map);
+    }
+
+    // Marcadores inicio / fin
+    const mkIcon = (color, label) => L.divIcon({
+      className: '',
+      html: `<div style="width:13px;height:13px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 1px 5px rgba(0,0,0,.4)" title="${label}"></div>`,
+      iconAnchor: [6, 6],
+    });
+    L.marker(latlngs[0], {icon: mkIcon('#34c759','Inicio')}).addTo(_map).bindPopup('Inicio');
+    L.marker(latlngs[latlngs.length-1], {icon: mkIcon('#ff3b5c','Fin')}).addTo(_map).bindPopup('Fin');
+
+    // Marcadores por km
+    addKmMarkers(_map, pts);
+
+    // Marcador de hover (sincronizado con gráficas)
+    _hoverMarker = L.circleMarker([0, 0], {
+      radius: 7, color: '#fff', fillColor: '#ff9500', fillOpacity: 1, weight: 2
+    }).addTo(_map);
+    _hoverMarker.setLatLng([0, 0]); // oculto al inicio
+    _hoverMarker.setStyle({opacity: 0, fillOpacity: 0});
+
+    _map.fitBounds(L.latLngBounds(latlngs), {padding: [30, 30]});
+
+    // ── Mostrar desnivel desde los datos de la ruta ───────────────────────────
+    if (data.ele_gain != null) {
+      document.getElementById('val-desnivel').innerHTML =
+        `${data.ele_gain}<span class="wkd-stat-unit"> m</span>`;
+      document.getElementById('card-desnivel').style.display = '';
+    }
+
+    // ── Stats extra: cadencia, calorías basales, clima ────────────────────────
+    const firstPt = pts[0];
+    const extraUrl = '/api/workouts/stats-extra?'
+      + 'start=' + encodeURIComponent(WK_START)
+      + '&end='  + encodeURIComponent(WK_END)
+      + '&dur_min=' + WK_DUR_MIN
+      + '&kcal='    + WK_KCAL
+      + (firstPt ? '&lat=' + firstPt.lat + '&lon=' + firstPt.lon : '');
+
+    fetch(extraUrl).then(r => r.json()).then(ex => {
+      // Cadencia
+      if (ex.cadence) {
+        document.getElementById('val-cadencia').innerHTML =
+          `${ex.cadence}<span class="wkd-stat-unit"> ppm</span>`;
+        document.getElementById('card-cadencia').style.display = '';
+      }
+
+      // Calorías con desglose activas/basales
+      if (ex.pct_active && ex.kcal_basal > 0) {
+        document.getElementById('kcal-split').style.display = '';
+        document.getElementById('kcal-split').innerHTML =
+          `+ ${ex.kcal_basal} kcal basales = <strong>${ex.kcal_total} kcal total</strong>`;
+        // Actualizar la clave de la tarjeta para que quede claro
+        document.querySelector('#card-kcal .wkd-stat-key').textContent = 'Calorías activas (esfuerzo)';
+      }
+
+      // Clima
+      if (ex.weather) {
+        const w   = ex.weather;
+        const wmo = WMO_CODES[w.code] || '🌡|Desconocido';
+        const [icon, desc] = wmo.split('|');
+        document.getElementById('val-clima-icon').textContent  = icon;
+        document.getElementById('val-clima-temp').textContent  = w.temp_c + ' °C';
+        document.getElementById('val-clima-desc').textContent  = desc;
+        document.getElementById('val-clima-extra').textContent =
+          `💨 ${w.windspeed} km/h · 💧 ${w.precip} mm`;
+        document.getElementById('card-clima').style.display = '';
+      }
+    }).catch(e => console.warn('Stats extra:', e));
+
+    // Footer
+    document.getElementById('wkd-footer').style.display = 'flex';
+    document.getElementById('wkd-pts').textContent      = data.n_points.toLocaleString('es-ES');
+    document.getElementById('wkd-dist').textContent     = data.dist_km;
+    document.getElementById('wkd-spd').textContent      = data.speed_avg ?? '—';
+    document.getElementById('wkd-spd-max').textContent  = data.speed_max ?? '—';
+    document.getElementById('wkd-ele').textContent      = data.ele_min != null ? `${data.ele_min}–${data.ele_max}` : '—';
+
+    // ── Gráficas ──────────────────────────────────────────────────────────────
+    document.getElementById('wkd-charts').style.display = 'grid';
+
+    // Reducir a 300 puntos para las gráficas
+    const step     = Math.max(1, Math.floor(pts.length / 300));
+    const reduced  = pts.filter((_,i) => i % step === 0);
+    const distCum  = []; // distancia acumulada en km
+    let dAcc = 0;
+    for (let i = 0; i < reduced.length; i++) {
+      if (i === 0) { distCum.push(0); continue; }
+      const p1 = reduced[i-1], p2 = reduced[i];
+      const dlat = (p2.lat-p1.lat)*Math.PI/180, dlon = (p2.lon-p1.lon)*Math.PI/180;
+      const a = Math.sin(dlat/2)**2 + Math.cos(p1.lat*Math.PI/180)*Math.cos(p2.lat*Math.PI/180)*Math.sin(dlon/2)**2;
+      dAcc += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      distCum.push(dAcc);
+    }
+
+    const eleData = reduced.map((p, i) => ({v: p.ele ?? 0, dist: distCum[i], idx: i * step}));
+    const spdData = reduced.map((p, i) => ({v: p.speed ?? 0, dist: distCum[i], idx: i * step}));
+
+    const eles = eleData.map(d => d.v);
+    const spds = spdData.map(d => d.v);
+    document.getElementById('ele-range-label').textContent = `${Math.round(Math.min(...eles))}–${Math.round(Math.max(...eles))} m`;
+    document.getElementById('spd-range-label').textContent = `0–${Math.round(Math.max(...spds))} km/h`;
+
+    // Función que mueve el marcador en el mapa
+    function onChartHover(reducedIdx, total) {
+      if (reducedIdx === null) {
+        _hoverMarker.setStyle({opacity: 0, fillOpacity: 0});
+      } else {
+        const pt = reduced[reducedIdx];
+        _hoverMarker.setLatLng([pt.lat, pt.lon]);
+        _hoverMarker.setStyle({opacity: 1, fillOpacity: 1});
+      }
+    }
+
+    setTimeout(() => {
+      drawChart('ele-chart', eleData, '#5b8dee', 'rgba(91,141,238,0.18)',
+        d => `${d.dist.toFixed(2)} km · ${Math.round(d.v)} m`,
+        'ele-cursor-line', 'ele-tooltip', onChartHover);
+      drawChart('spd-chart', spdData, '#34c759', 'rgba(52,199,89,0.15)',
+        d => `${d.dist.toFixed(2)} km · ${d.v.toFixed(1)} km/h`,
+        'spd-cursor-line', 'spd-tooltip', onChartHover);
+    }, 100);
+
+    window.addEventListener('resize', () => {
+      drawChart('ele-chart', eleData, '#5b8dee', 'rgba(91,141,238,0.18)',
+        d => `${d.dist.toFixed(2)} km · ${Math.round(d.v)} m`,
+        'ele-cursor-line', 'ele-tooltip', onChartHover);
+      drawChart('spd-chart', spdData, '#34c759', 'rgba(52,199,89,0.15)',
+        d => `${d.dist.toFixed(2)} km · ${d.v.toFixed(1)} km/h`,
+        'spd-cursor-line', 'spd-tooltip', onChartHover);
+      if (_hrData.length) drawChart('hr-chart', _hrData, '#ff3b5c', 'rgba(255,59,92,0.15)',
+        d => `${d.bpm} PPM`,
+        'hr-cursor-line', 'hr-tooltip', null);
+    });
+
+    // ── Frecuencia cardíaca ──────────────────────────────────────────────────
+    let _hrData = [];
+    try {
+      const hrRes  = await fetch('/api/workouts/heartrate?start=' +
+        encodeURIComponent(WK_START) + '&end=' + encodeURIComponent(WK_END));
+      const hrRows = await hrRes.json();
+
+      if (hrRows.length > 1) {
+        // Convertir timestamps a segundos relativos al inicio del entreno
+        const t0 = new Date(WK_START.replace(' ', 'T').replace(' +', '+').replace(/(\+\d{2})(\d{2})$/, '$1:$2')).getTime();
+        const t1 = new Date(WK_END.replace(' ', 'T').replace(' +', '+').replace(/(\+\d{2})(\d{2})$/, '$1:$2')).getTime();
+        const dur = (t1 - t0) / 1000;
+
+        _hrData = hrRows.map(r => {
+          const t = new Date(r.time.replace(' ', 'T').replace(' +', '+').replace(/(\+\d{2})(\d{2})$/, '$1:$2')).getTime();
+          const pct = Math.max(0, Math.min(1, (t - t0) / (t1 - t0)));
+          return { v: r.bpm, bpm: r.bpm, pct };
+        });
+
+        const bpms = _hrData.map(d => d.bpm);
+        const bpmMin = Math.min(...bpms), bpmMax = Math.max(...bpms);
+        const bpmAvg = Math.round(bpms.reduce((a,b)=>a+b,0)/bpms.length);
+
+        document.getElementById('hr-chart-card').style.display = '';
+        document.getElementById('hr-range-label').textContent =
+          `${bpmMin}–${bpmMax} PPM · media ${bpmAvg} PPM`;
+
+        // Cambiar a 3 columnas si hay FC
+        document.getElementById('wkd-charts').style.gridTemplateColumns = '1fr 1fr 1fr';
+
+        // onHover para FC: interpolar posición en la ruta por porcentaje de tiempo
+        function onHrHover(idx, total) {
+          if (idx === null) {
+            _hoverMarker.setStyle({opacity: 0, fillOpacity: 0});
+            return;
+          }
+          const pct = _hrData[idx].pct;  // 0–1 del tiempo del entreno
+          // Buscar el punto de la ruta más cercano a ese porcentaje
+          const targetIdx = Math.round(pct * (pts.length - 1));
+          const pt = pts[Math.min(targetIdx, pts.length - 1)];
+          _hoverMarker.setLatLng([pt.lat, pt.lon]);
+          _hoverMarker.setStyle({opacity: 1, fillOpacity: 1});
+        }
+
+        setTimeout(() => drawChart('hr-chart', _hrData, '#ff3b5c', 'rgba(255,59,92,0.15)',
+          d => `${d.bpm} PPM`,
+          'hr-cursor-line', 'hr-tooltip', onHrHover), 120);
+
+        // ── Zonas de FC ────────────────────────────────────────────────────────
+        computeHRZones(hrRows, WK_DUR_MIN);
+      }
+    } catch(e) { console.warn('FC no disponible:', e); }
+
+    // ── Splits por kilómetro ─────────────────────────────────────────────────
+    computeSplits(pts);
+
+    // ── Tiempo en movimiento ─────────────────────────────────────────────────
+    computeMovingTime(pts, WK_DUR_MIN);
+
+    // ── Mejor ritmo ──────────────────────────────────────────────────────────
+    markBestKm(pts);
+
+  } catch(e) {
+    document.getElementById('wkd-loading').textContent = 'Error al cargar la ruta: ' + e.message;
+    console.error(e);
+  }
+// ── Zonas de FC ───────────────────────────────────────────────────────────────
+function computeHRZones(hrRows, durMin) {
+  if (!hrRows.length) return;
+
+  // FC máxima estimada por edad (si no la conocemos, usamos 220 - edad estimada)
+  // Usamos el máximo real del entreno como referencia
+  const bpms   = hrRows.map(r => r.bpm);
+  const hrMax  = Math.max(...bpms);
+  const hrMin  = Math.min(...bpms);
+
+  // Zonas basadas en % de FC máxima (método Karvonen simplificado)
+  const ZONES = [
+    { name: 'Z1 Recuperación', min: 0,   max: 0.60, color: '#64b5f6' },
+    { name: 'Z2 Aeróbico',     min: 0.60,max: 0.70, color: '#81c784' },
+    { name: 'Z3 Tempo',        min: 0.70,max: 0.80, color: '#ffb74d' },
+    { name: 'Z4 Umbral',       min: 0.80,max: 0.90, color: '#e57373' },
+    { name: 'Z5 Máximo',       min: 0.90,max: 1.01, color: '#ab47bc' },
+  ];
+
+  // Contar segundos en cada zona (aproximado: cada medición ≈ intervalo)
+  const zoneSecs = new Array(ZONES.length).fill(0);
+  for (let i = 0; i < hrRows.length; i++) {
+    const pct = hrRows[i].bpm / hrMax;
+    for (let z = 0; z < ZONES.length; z++) {
+      if (pct >= ZONES[z].min && pct < ZONES[z].max) {
+        // Estimar intervalo entre mediciones
+        const interval = i < hrRows.length - 1 ? 5 : 5; // ~5 seg entre muestras
+        zoneSecs[z] += interval;
+        break;
+      }
+    }
+  }
+
+  const totalSecs = zoneSecs.reduce((a,b) => a+b, 0) || 1;
+  const maxSecs   = Math.max(...zoneSecs);
+
+  const wrap = document.getElementById('hr-zones-wrap');
+  if (!wrap) return;
+
+  wrap.innerHTML = ZONES.map((z, i) => {
+    const secs = zoneSecs[i];
+    const min  = Math.floor(secs / 60), sec = secs % 60;
+    const pct  = Math.round(secs / totalSecs * 100);
+    const barW = maxSecs > 0 ? Math.round(secs / maxSecs * 100) : 0;
+    const bpmRange = `${Math.round(z.min * hrMax)}–${Math.round(z.max * hrMax)} PPM`;
+    return `<div class="hr-zone-row">
+      <div class="hr-zone-label" style="color:${z.color}">${z.name}</div>
+      <div class="hr-zone-bar-track">
+        <div class="hr-zone-bar-fill" style="width:${barW}%;background:${z.color}"></div>
+      </div>
+      <div class="hr-zone-time">${min}m ${sec.toString().padStart(2,'0')}s</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);width:90px;flex-shrink:0">${pct}% · ${bpmRange}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('hr-zones-label').textContent =
+    `FC máx entreno: ${hrMax} PPM · FC mín: ${hrMin} PPM`;
+  document.getElementById('hr-zones-card').style.display = '';
+}
+
+// ── Splits por km y mejor km ───────────────────────────────────────────────────
+function haversineKm(p1, p2) {
+  const dlat = (p2.lat - p1.lat) * Math.PI / 180;
+  const dlon = (p2.lon - p1.lon) * Math.PI / 180;
+  const a = Math.sin(dlat/2)**2 + Math.cos(p1.lat*Math.PI/180) *
+            Math.cos(p2.lat*Math.PI/180) * Math.sin(dlon/2)**2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function computeSplits(points) {
+  if (!points.length) return;
+
+  const splits = [];
+  let distAcc = 0, kmStart = 0, kmStartEle = points[0].ele ?? 0;
+  let tStart = points[0].time ? new Date(points[0].time).getTime() : null;
+  let kmN = 1;
+
+  for (let i = 1; i < points.length; i++) {
+    distAcc += haversineKm(points[i-1], points[i]);
+    if (distAcc >= kmN) {
+      const p   = points[i];
+      const tEnd = p.time ? new Date(p.time).getTime() : null;
+      const secs = tStart && tEnd ? (tEnd - tStart) / 1000 : null;
+      const minKm = secs ? secs / 60 : null;
+      const kmh   = secs ? 3600 / secs : null;
+      const eleEnd = p.ele ?? kmStartEle;
+      const eleDelta = Math.round(eleEnd - kmStartEle);
+
+      splits.push({
+        km: kmN, secs,
+        pace: minKm ? `${Math.floor(minKm)}'${Math.round((minKm%1)*60).toString().padStart(2,'0')}"` : '—',
+        kmh:  kmh  ? kmh.toFixed(1) : '—',
+        eleDelta,
+      });
+
+      kmN++;
+      kmStart = distAcc;
+      kmStartEle = eleEnd;
+      tStart = tEnd;
+    }
+  }
+
+  if (!splits.length) return;
+
+  // Mejor km (menor tiempo)
+  const bestIdx = splits.reduce((bi, s, i) =>
+    s.secs && (!splits[bi].secs || s.secs < splits[bi].secs) ? i : bi, 0);
+
+  const maxSecs = Math.max(...splits.map(s => s.secs || 0));
+
+  const tbody = document.getElementById('splits-body');
+  tbody.innerHTML = splits.map((s, i) => {
+    const isBest = i === bestIdx;
+    const barW   = s.secs && maxSecs ? Math.round((1 - (s.secs - Math.min(...splits.map(x=>x.secs||maxSecs))) / (maxSecs - Math.min(...splits.map(x=>x.secs||maxSecs)) || 1)) * 80 + 20) : 20;
+    const eleStr = s.eleDelta > 0 ? `↑${s.eleDelta}m` : s.eleDelta < 0 ? `↓${Math.abs(s.eleDelta)}m` : '—';
+    const eleColor = s.eleDelta > 0 ? '#e57373' : s.eleDelta < 0 ? '#81c784' : 'var(--muted)';
+    return `<tr>
+      <td>${s.km} km</td>
+      <td class="${isBest?'split-best':''}">${isBest?'⭐ ':''}${s.pace} /km</td>
+      <td>${s.kmh} km/h</td>
+      <td style="color:${eleColor}">${eleStr}</td>
+      <td><div class="split-bar" style="width:${barW}px;background:${isBest?'#34c759':'#5b8dee'}"></div></td>
+    </tr>`;
+  }).join('');
+
+  const label = `${splits.length} km · mejor: km ${splits[bestIdx].km} (${splits[bestIdx].pace}/km)`;
+  document.getElementById('splits-label').textContent = label;
+  document.getElementById('splits-card').style.display = '';
+}
+
+function markBestKm(points) {
+  // Ya integrado en computeSplits — el ⭐ marca el mejor km en la tabla
+}
+
+// ── Tiempo en movimiento ───────────────────────────────────────────────────────
+function computeMovingTime(points, totalMin) {
+  const MOVING_THRESHOLD = 0.5; // km/h — por debajo se considera parada
+  let movingSecs = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const speed = points[i].speed ?? 0;  // ya en km/h desde el servicio
+    if (speed >= MOVING_THRESHOLD) {
+      // Estimar duración de este segmento desde timestamps si existen
+      if (points[i].time && points[i-1].time) {
+        const dt = (new Date(points[i].time) - new Date(points[i-1].time)) / 1000;
+        movingSecs += Math.min(dt, 30); // cap a 30s por punto por si hay gaps
+      } else {
+        movingSecs += 1; // fallback: 1s por punto
+      }
+    }
+  }
+
+  const movingMin = movingSecs / 60;
+  const stopMin   = totalMin - movingMin;
+  const movingPct = Math.round(movingMin / totalMin * 100);
+
+  // Formatear
+  const fmtMin = m => {
+    const h = Math.floor(m/60), min = Math.floor(m%60), sec = Math.round((m%1)*60);
+    return h > 0 ? `${h}h ${min.toString().padStart(2,'0')}m` : `${min}m ${sec.toString().padStart(2,'0')}s`;
+  };
+
+  document.getElementById('val-moving-time').textContent = fmtMin(movingMin);
+  document.getElementById('val-moving-pct').innerHTML =
+    `${movingPct}% del total<br>` +
+    `<span style="color:var(--dim)">Parado: ${fmtMin(Math.max(0,stopMin))}</span>`;
+  document.getElementById('card-moving').style.display = '';
+}
+
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Entrenamientos{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Lista ────────────────────────────────────────────────────────────────── */
+.wk-header-row {
+  display: flex; align-items: baseline; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+}
+.wk-header-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+.wk-header-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+.wk-search-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.wk-search-row input, .wk-search-row select {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px; font-family: var(--font-mono);
+  background: var(--surface); color: var(--text); outline: none;
+  transition: border-color .15s;
+}
+.wk-search-row input { flex: 1; min-width: 160px; }
+.wk-search-row input:focus, .wk-search-row select:focus { border-color: var(--text); }
+.wk-clear-btn {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; font-size: 12px; font-family: var(--font-mono); color: var(--muted);
+  cursor: pointer; transition: all .15s;
+}
+.wk-clear-btn:hover { border-color: var(--text); color: var(--text); }
+
+.wk-list { display: flex; flex-direction: column; gap: 2px; }
+
+.wk-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid transparent; background: var(--surface);
+  transition: background .12s, border-color .12s;
+  cursor: default;
+}
+.wk-item.has-route { cursor: pointer; }
+.wk-item.has-route:hover { background: var(--surface-2); border-color: var(--border); }
+
+.wk-item-icon {
+  font-size: 20px; width: 36px; text-align: center; flex-shrink: 0;
+  filter: grayscale(1); opacity: .55;
+}
+.wk-item.has-route .wk-item-icon { filter: none; opacity: 1; }
+
+.wk-item-info { flex: 1; min-width: 0; }
+.wk-item-name {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.wk-item-sub {
+  font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px;
+}
+
+.wk-item-stats {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0;
+}
+.wk-item-stat-main { font-size: 13px; font-weight: 700; color: var(--text); }
+.wk-item-stat-sub  { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+
+.wk-route-badge {
+  font-size: 9px; font-family: var(--font-mono); padding: 2px 6px;
+  border-radius: 99px; background: #e6f5ed; color: #1a8a4a;
+  border: 1px solid rgba(26,138,74,.2); flex-shrink: 0; white-space: nowrap;
+}
+
+.wk-pagination {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+}
+.wk-page-btn {
+  height: 28px; padding: 0 12px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); cursor: pointer; font-family: var(--font-mono);
+  font-size: 11px; color: var(--muted); transition: all .15s;
+}
+.wk-page-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+.wk-page-btn:disabled { opacity: .3; cursor: default; }
+
+.wk-no-results {
+  padding: 40px; text-align: center; font-family: var(--font-mono);
+  font-size: 12px; color: var(--muted);
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.wk-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.wk-modal-backdrop.open { display: flex; animation: wkFadeIn .2s ease; }
+
+.wk-modal {
+  background: var(--surface); border-radius: 16px;
+  width: 100%; max-width: 920px; max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.35);
+  animation: wkSlideUp .25s ease; overflow: hidden;
+}
+
+/* Cabecera */
+.wk-modal-header {
+  display: flex; align-items: stretch; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.wk-modal-meta { display: flex; align-items: stretch; flex: 1; overflow-x: auto; }
+.wk-modal-meta-item {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 10px 16px; border-right: 1px solid var(--border); flex-shrink: 0;
+}
+.wk-modal-key { font-family: var(--font-mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.wk-modal-val { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.wk-modal-icon { font-size: 20px; margin-top: 2px; }
+
+.wk-modal-actions {
+  display: flex; align-items: center; gap: 5px; padding: 0 12px; flex-shrink: 0;
+}
+.wk-action-btn {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: none; cursor: pointer; font-size: 11px; font-family: var(--font-mono);
+  color: var(--muted); transition: all .15s; white-space: nowrap;
+}
+.wk-action-btn:hover { border-color: var(--text); color: var(--text); }
+.wk-close-btn {
+  width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 7px;
+  background: none; cursor: pointer; font-size: 15px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.wk-close-btn:hover { border-color: var(--text); color: var(--text); }
+
+/* Mapa */
+.wk-map-wrap {
+  flex: 1; position: relative; min-height: 360px;
+}
+#wk-map { width: 100%; height: 100%; min-height: 360px; }
+
+/* Stats sobre el mapa */
+.wk-map-stats {
+  position: absolute; bottom: 12px; left: 12px; z-index: 1000;
+  background: rgba(255,255,255,.95); border-radius: 10px;
+  padding: 10px 14px; display: flex; gap: 16px; flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15); border: 1px solid var(--border);
+}
+.wk-stat { display: flex; flex-direction: column; }
+.wk-stat-val { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+.wk-stat-key { font-size: 9px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+
+/* Sin ruta */
+.wk-no-route {
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  gap: 10px; height: 100%; padding: 40px; color: var(--muted); text-align: center;
+}
+.wk-no-route-icon { font-size: 40px; opacity: .3; }
+
+/* Footer */
+.wk-modal-footer {
+  display: flex; align-items: center; padding: 7px 16px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+  font-family: var(--font-mono); font-size: 10px; color: var(--dim);
+}
+.wk-modal-footer span:last-child { margin-left: auto; color: var(--muted); }
+
+@keyframes wkFadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes wkSlideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wk-header-row">
+  <h2 class="wk-header-title">Entrenamientos</h2>
+  <span class="wk-header-count" id="wk-count-label"></span>
+</div>
+
+<div class="wk-search-row">
+  <input type="text" id="wk-text-filter" placeholder="Buscar por tipo, fecha…" autocomplete="off">
+  <select id="wk-type-filter"><option value="">Todos los tipos</option></select>
+  <select id="wk-period-filter" onchange="loadWorkouts(this.value)">
+    <option value="month">Último mes</option>
+    <option value="week">Última semana</option>
+    <option value="year">Último año</option>
+    <option value="all">Todo el historial</option>
+  </select>
+  <button class="wk-clear-btn" onclick="clearWkFilters()">✕ Limpiar</button>
+</div>
+
+<div class="wk-list"    id="wk-list-body"></div>
+<div class="wk-no-results" id="wk-no-results" style="display:none">Sin resultados</div>
+
+<div class="wk-pagination" id="wk-pagination" style="display:none">
+  <button class="wk-page-btn" id="wk-btn-prev" onclick="wkChangePage(-1)">← Anterior</button>
+  <span id="wk-page-info"></span>
+  <button class="wk-page-btn" id="wk-btn-next" onclick="wkChangePage(1)">Siguiente →</button>
+</div>
+
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let ALL_WK = [], _wkFiltered = [], _wkPage = 0, _wkLoading = false;
+const PAGE_SIZE = 80;
+
+// ── Cargar desde API ──────────────────────────────────────────────────────────
+async function loadWorkouts(period) {
+  if (_wkLoading) return;
+  _wkLoading = true;
+  const body = document.getElementById('wk-list-body');
+  body.innerHTML = '<div style="padding:40px;text-align:center;font-family:monospace;color:#888;font-size:12px">Cargando entrenamientos…</div>';
+  try {
+    const res = await fetch('/api/workouts/list?period=' + period);
+    ALL_WK    = (await res.json()).map((w, i) => ({...w, _idx: i}));
+    // Poblar selector de tipos
+    const sel = document.getElementById('wk-type-filter');
+    const existing = sel ? [...sel.options].map(o => o.value) : [];
+    [...new Set(ALL_WK.map(w => w.name))].sort().forEach(t => {
+      if (sel && !existing.includes(t)) {
+        const o = document.createElement('option');
+        o.value = t; o.textContent = t; sel.appendChild(o);
+      }
+    });
+    applyWkFilters();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('wk-list-body').innerHTML =
+      '<div style="padding:40px;text-align:center;color:#c00;font-family:monospace;font-size:12px">Error: ' + e.message + '</div>';
+  }
+  _wkLoading = false;
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
+function applyWkFilters() {
+  const tv = (document.getElementById('wk-text-filter')?.value || '').trim().toLowerCase();
+  const ty = document.getElementById('wk-type-filter')?.value || '';
+  _wkFiltered = ALL_WK.filter(w =>
+    (!tv || w.name.toLowerCase().includes(tv) || w.date.includes(tv)) &&
+    (!ty || w.name === ty)
+  );
+  _wkPage = 0;
+  renderWkList();
+}
+
+function clearWkFilters() {
+  const tf = document.getElementById('wk-text-filter');
+  const ts = document.getElementById('wk-type-filter');
+  if (tf) tf.value = '';
+  if (ts) ts.value = '';
+  applyWkFilters();
+}
+
+document.getElementById('wk-text-filter')?.addEventListener('input', applyWkFilters);
+document.getElementById('wk-type-filter')?.addEventListener('change', applyWkFilters);
+
+// ── Renderizar lista ──────────────────────────────────────────────────────────
+function renderWkList() {
+  const body  = document.getElementById('wk-list-body');
+  const noRes = document.getElementById('wk-no-results');
+  const start = _wkPage * PAGE_SIZE;
+  const slice = _wkFiltered.slice(start, start + PAGE_SIZE);
+
+  noRes.style.display = slice.length ? 'none' : 'block';
+
+  body.innerHTML = slice.map(w => {
+    const dist = w.dist_km ? w.dist_km + ' km' : '';
+    const kcal = w.kcal   ? w.kcal + ' kcal'  : '';
+    const sub  = [w.date, w.time, w.source].filter(Boolean).join(' · ');
+    return `<a class="wk-item ${w.has_route ? 'has-route' : ''}" href="/workouts/${w._idx}"
+               style="text-decoration:none;display:flex;align-items:center;gap:12px">
+      <div class="wk-item-icon">${w.icon}</div>
+      <div class="wk-item-info">
+        <div class="wk-item-name">${w.name}</div>
+        <div class="wk-item-sub">${sub}</div>
+      </div>
+      <div class="wk-item-stats">
+        <div class="wk-item-stat-main">${w.duration_fmt}</div>
+        <div class="wk-item-stat-sub">${[dist, kcal].filter(Boolean).join(' · ')}</div>
+      </div>
+      ${w.has_route ? '<span class="wk-route-badge">🗺 Ruta</span>' : ''}
+    </a>`;
+  }).join('');
+
+  const total = _wkFiltered.length, pages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById('wk-count-label').textContent =
+    total === ALL_WK.length ? total + ' entrenamientos' : total + ' de ' + ALL_WK.length;
+
+  const pag = document.getElementById('wk-pagination');
+  pag.style.display = pages > 1 ? 'flex' : 'none';
+  document.getElementById('wk-page-info').textContent = 'Página ' + (_wkPage+1) + ' de ' + pages;
+  document.getElementById('wk-btn-prev').disabled = _wkPage === 0;
+  document.getElementById('wk-btn-next').disabled = _wkPage >= pages - 1;
+}
+
+function wkChangePage(d) {
+  _wkPage = Math.max(0, Math.min(_wkPage + d, Math.ceil(_wkFiltered.length / PAGE_SIZE) - 1));
+  renderWkList();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ── Arrancar ──────────────────────────────────────────────────────────────────
+loadWorkouts('month');
+</script>
+{% endblock %}

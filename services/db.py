@@ -1,0 +1,1180 @@
+"""
+services/db.py — SQLite backend para Apple Health Dashboard
+"""
+
+import sqlite3
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+from contextlib import contextmanager
+
+DATA_DIR   = Path('data')
+DB_FILE    = DATA_DIR / 'health.db'
+STATS_FILE = DATA_DIR / 'stats.json'
+
+# ── Tipos HealthKit ───────────────────────────────────────────────────────────
+STEP_TYPES       = {'HKQuantityTypeIdentifierStepCount'}
+DISTANCE_TYPES   = {'HKQuantityTypeIdentifierDistanceWalkingRunning',
+                    'HKQuantityTypeIdentifierDistanceCycling',
+                    'HKQuantityTypeIdentifierDistanceSwimming'}
+ACTIVE_CAL_TYPES = {'HKQuantityTypeIdentifierActiveEnergyBurned'}
+BASAL_CAL_TYPES  = {'HKQuantityTypeIdentifierBasalEnergyBurned'}
+HEART_RATE_TYPES = {'HKQuantityTypeIdentifierHeartRate'}
+SLEEP_TYPES      = {'HKCategoryTypeIdentifierSleepAnalysis'}
+
+# Fases de sueño — valor string que viene del XML
+SLEEP_DEEP  = {'HKCategoryValueSleepAnalysisAsleepDeep'}
+SLEEP_REM   = {'HKCategoryValueSleepAnalysisAsleepREM'}
+SLEEP_LIGHT = {'HKCategoryValueSleepAnalysisAsleepCore',
+               'HKCategoryValueSleepAnalysisAsleep'}  # legacy
+SLEEP_INBED = {'HKCategoryValueSleepAnalysisInBed'}
+
+
+# ── Conexión ──────────────────────────────────────────────────────────────────
+@contextmanager
+def get_conn():
+    DATA_DIR.mkdir(exist_ok=True)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_db() -> None:
+    """Crea/migra el esquema. Seguro llamarlo siempre al arrancar."""
+    with get_conn() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS records (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                type        TEXT    NOT NULL,
+                value       REAL,
+                value_str   TEXT,
+                unit        TEXT,
+                start_date  TEXT    NOT NULL,
+                end_date    TEXT,
+                source_name TEXT,
+                date_day    TEXT    GENERATED ALWAYS AS (substr(start_date, 1, 10)) STORED
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_dedup
+                ON records (type, start_date);
+            CREATE INDEX IF NOT EXISTS idx_day
+                ON records (date_day);
+            CREATE INDEX IF NOT EXISTS idx_type_day
+                ON records (type, date_day);
+        """)
+        # Migración: añadir value_str si no existe (BDs antiguas)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(records)").fetchall()]
+        if 'value_str' not in cols:
+            conn.execute("ALTER TABLE records ADD COLUMN value_str TEXT")
+            conn.commit()
+
+
+# ── Escritura ─────────────────────────────────────────────────────────────────
+def insert_records(records: list[dict]) -> tuple[int, int]:
+    if not records:
+        return 0, 0
+
+    rows = []
+    for r in records:
+        raw = r.get('value')
+        num = _to_float(raw)
+        # Si no es numérico, guardarlo como string
+        val_str = str(raw) if raw is not None and num is None else None
+        rows.append((
+            r['type'], num, val_str, r.get('unit', ''),
+            r['startDate'], r.get('endDate', ''), r.get('sourceName', '')
+        ))
+
+    with get_conn() as conn:
+        before = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+        conn.executemany(
+            'INSERT OR IGNORE INTO records '
+            '(type, value, value_str, unit, start_date, end_date, source_name) '
+            'VALUES (?,?,?,?,?,?,?)',
+            rows
+        )
+        conn.commit()
+        after = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+
+    inserted = after - before
+    return inserted, len(records) - inserted
+
+
+def _to_float(val) -> float | None:
+    try:
+        return float(val) if val not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        return None
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
+def load_stats() -> dict | None:
+    if not STATS_FILE.exists():
+        return None
+    with open(STATS_FILE) as f:
+        return json.load(f)
+
+
+def save_stats(stats: dict) -> None:
+    DATA_DIR.mkdir(exist_ok=True)
+    tmp = STATS_FILE.with_suffix('.tmp')
+    with open(tmp, 'w') as f:
+        json.dump(stats, f, indent=2)
+    tmp.replace(STATS_FILE)
+
+
+def rebuild_stats() -> dict:
+    with get_conn() as conn:
+        total   = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+        n_types = conn.execute('SELECT COUNT(DISTINCT type) FROM records').fetchone()[0]
+        dates   = conn.execute(
+            'SELECT MIN(date_day), MAX(date_day) FROM records WHERE date_day != ""'
+        ).fetchone()
+        top = conn.execute(
+            'SELECT type, COUNT(*) n FROM records GROUP BY type ORDER BY n DESC LIMIT 10'
+        ).fetchall()
+
+    d_min, d_max = (dates[0] or ''), (dates[1] or '')
+    days = 0
+    if d_min and d_max:
+        days = (datetime.strptime(d_max, '%Y-%m-%d') -
+                datetime.strptime(d_min, '%Y-%m-%d')).days
+
+    stats = {
+        'total_records':   total,
+        'metrics_count':   n_types,
+        'date_range_days': days,
+        'date_min':        d_min,
+        'date_max':        d_max,
+        'last_sync':       datetime.now().strftime('%d/%m/%y'),
+        'top_types':       [[r['type'], r['n']] for r in top],
+    }
+    save_stats(stats)
+    return stats
+
+
+# ── Helpers internos ──────────────────────────────────────────────────────────
+def _sum_numeric(date_str: str, types: set[str]) -> float:
+    if not DB_FILE.exists():
+        return 0.0
+    placeholders = ','.join('?' * len(types))
+    with get_conn() as conn:
+        row = conn.execute(
+            f'SELECT COALESCE(SUM(value),0) FROM records '
+            f'WHERE type IN ({placeholders}) AND date_day=?',
+            (*types, date_str)
+        ).fetchone()
+    return row[0] if row else 0.0
+
+
+def _parse_dt(s: str) -> datetime | None:
+    for fmt in ('%Y-%m-%d %H:%M:%S %z', '%Y-%m-%d %H:%M:%S'):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            pass
+    return None
+
+
+def _interval_minutes(start: str, end: str) -> float:
+    s, e = _parse_dt(start), _parse_dt(end)
+    if s and e:
+        return (e - s).total_seconds() / 60
+    return 0.0
+
+
+# ── Pasos (deduplicado por fuente) ────────────────────────────────────────────
+def get_steps_for_day(date_str: str) -> int:
+    if not DB_FILE.exists():
+        return 0
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, source_name FROM records '
+            'WHERE type=? AND date_day=?',
+            ('HKQuantityTypeIdentifierStepCount', date_str)
+        ).fetchall()
+    if not rows:
+        return 0
+    by_src: dict[str, float] = {}
+    for r in rows:
+        src = (r['source_name'] or 'unknown').strip()
+        by_src[src] = by_src.get(src, 0.0) + (r['value'] or 0.0)
+    def prio(s):
+        sl = s.lower()
+        return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
+    return int(by_src[min(by_src, key=prio)])
+
+
+# ── Distancia (respeta unidad km/m) ──────────────────────────────────────────
+def get_distance_km(date_str: str) -> float:
+    if not DB_FILE.exists():
+        return 0.0
+    ph = ','.join('?' * len(DISTANCE_TYPES))
+    with get_conn() as conn:
+        rows = conn.execute(
+            f'SELECT value, unit FROM records '
+            f'WHERE type IN ({ph}) AND date_day=?',
+            (*DISTANCE_TYPES, date_str)
+        ).fetchall()
+    total = 0.0
+    for r in rows:
+        v = r['value'] or 0.0
+        u = (r['unit'] or '').lower()
+        total += v if u in ('km', 'kilometer', 'kilometers') else v / 1000.0
+    return total
+
+
+# ── Calorías activas ──────────────────────────────────────────────────────────
+def get_calories(date_str: str) -> int:
+    if not DB_FILE.exists():
+        return 0
+    return int(_sum_numeric(date_str, ACTIVE_CAL_TYPES))
+
+
+# ── Serie horaria de calorías (para mini barras) ──────────────────────────────
+def get_active_energy_series(date_str: str) -> list:
+    if not DB_FILE.exists():
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? ORDER BY start_date',
+            ('HKQuantityTypeIdentifierActiveEnergyBurned', date_str)
+        ).fetchall()
+    hourly: dict[int, float] = {}
+    for r in rows:
+        try:
+            h = int(r['start_date'][11:13])
+            hourly[h] = hourly.get(h, 0.0) + (r['value'] or 0.0)
+        except Exception:
+            pass
+    return [{'h': h, 'v': round(v, 1)} for h, v in sorted(hourly.items())]
+
+
+# ── Frecuencia cardíaca ───────────────────────────────────────────────────────
+def get_heart_rate_day(date_str: str) -> dict:
+    if not DB_FILE.exists():
+        return {}
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date',
+            ('HKQuantityTypeIdentifierHeartRate', date_str)
+        ).fetchall()
+    if not rows:
+        return {}
+    vals = [r['value'] for r in rows]
+    # Serie: promedio por hora
+    hourly: dict[int, list] = {}
+    for r in rows:
+        try:
+            h = int(r['start_date'][11:13])
+            hourly.setdefault(h, []).append(r['value'])
+        except Exception:
+            pass
+    series = [{'h': h, 'v': round(sum(v)/len(v))} for h, v in sorted(hourly.items())]
+    # Última medición del día como "actual"
+    return {
+        'current': int(vals[-1]),
+        'avg':     int(sum(vals) / len(vals)),
+        'min':     int(min(vals)),
+        'max':     int(max(vals)),
+        'series':  series,
+    }
+
+
+# ── HRV ───────────────────────────────────────────────────────────────────────
+def get_hrv_day(date_str: str) -> dict:
+    if not DB_FILE.exists():
+        return {}
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date',
+            ('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', date_str)
+        ).fetchall()
+    if not rows:
+        return {}
+    vals = [r['value'] for r in rows]
+    series = [{'i': i, 'v': round(r['value'], 1)} for i, r in enumerate(rows)]
+    return {'avg': round(sum(vals)/len(vals), 1), 'series': series}
+
+
+# ── Sueño ─────────────────────────────────────────────────────────────────────
+def get_sleep_day(date_str: str) -> dict:
+    """
+    Sueño de la noche que termina en date_str (el Watch graba la noche
+    del día anterior → madrugada de date_str).
+    value_str contiene el string de fase: HKCategoryValueSleepAnalysis*
+    """
+    if not DB_FILE.exists():
+        return {}
+
+    dt   = datetime.strptime(date_str, '%Y-%m-%d')
+    prev = (dt - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value_str, start_date, end_date FROM records '
+            'WHERE type=? AND (date_day=? OR date_day=?) '
+            'AND value_str IS NOT NULL '
+            'ORDER BY start_date',
+            ('HKCategoryTypeIdentifierSleepAnalysis', prev, date_str)
+        ).fetchall()
+
+    if not rows:
+        return {}
+
+    deep_min = rem_min = light_min = 0.0
+
+    # Parsear todos los segmentos
+    all_segs = []
+    for r in rows:
+        vs   = r['value_str'] or ''
+        mins = _interval_minutes(r['start_date'], r['end_date'])
+        if mins <= 0:
+            continue
+        if 'AsleepDeep' in vs:
+            phase = 'deep'
+        elif 'AsleepREM' in vs:
+            phase = 'rem'
+        elif 'AsleepCore' in vs:
+            phase = 'light'
+        elif 'Asleep' in vs and 'InBed' not in vs:
+            phase = 'light'
+        elif 'Awake' in vs:
+            phase = 'awake'
+        else:
+            continue  # InBed no cuenta
+        all_segs.append({
+            'phase': phase,
+            'mins':  round(mins, 1),
+            'start': r['start_date'],
+            'end':   r['end_date'],
+        })
+
+    if not all_segs:
+        return {}
+
+    # Agrupar en sesiones (gap > 60 min = nueva sesión)
+    sessions = []
+    cur_session = [all_segs[0]]
+    for seg in all_segs[1:]:
+        gap = _interval_minutes(cur_session[-1]['end'], seg['start'])
+        if gap > 60:
+            sessions.append(cur_session)
+            cur_session = [seg]
+        else:
+            cur_session.append(seg)
+    sessions.append(cur_session)
+
+    # Tomar la sesión más larga (sueño principal, no siestas cortas)
+    def session_sleep_min(s):
+        return sum(sg['mins'] for sg in s if sg['phase'] != 'awake')
+    main_session = max(sessions, key=session_sleep_min)
+    segments = main_session
+
+    # Recalcular totales de la sesión principal
+    for seg in segments:
+        if seg['phase'] == 'deep':  deep_min  += seg['mins']
+        elif seg['phase'] == 'rem': rem_min   += seg['mins']
+        elif seg['phase'] == 'light': light_min += seg['mins']
+
+    total_min = deep_min + rem_min + light_min
+    if total_min == 0:
+        return {}
+
+    h = int(total_min // 60)
+    m = int(total_min % 60)
+    return {
+        'total_str': f'{h}h {m:02d}m',
+        'total_min': round(total_min),
+        'deep_min':  round(deep_min),
+        'rem_min':   round(rem_min),
+        'light_min': round(light_min),
+        'segments':  segments,
+    }
+
+
+# ── De pie ────────────────────────────────────────────────────────────────────
+def get_stand_hours(date_str: str) -> int:
+    """
+    HKCategoryTypeIdentifierAppleStandHour: cada registro = 1 hora de pie.
+    value es null (es una categoría), pero la PRESENCIA del registro indica
+    que esa hora estuvo de pie. Contamos registros, no suma de value.
+    """
+    if not DB_FILE.exists():
+        return 0
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT COUNT(*) FROM records '
+            'WHERE type=? AND date_day=?',
+            ('HKCategoryTypeIdentifierAppleStandHour', date_str)
+        ).fetchone()
+    return row[0] if row else 0
+
+
+# ── Minutos de ejercicio ──────────────────────────────────────────────────────
+def get_exercise_minutes(date_str: str) -> int:
+    if not DB_FILE.exists():
+        return 0
+    return int(_sum_numeric(date_str, {'HKQuantityTypeIdentifierAppleExerciseTime'}))
+
+
+# ── Entrenamientos ────────────────────────────────────────────────────────────
+def get_workouts_day(date_str: str) -> list:
+    if not DB_FILE.exists():
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT type, value, unit, start_date, end_date FROM records "
+            "WHERE type LIKE 'HKWorkout%' AND date_day=? ORDER BY start_date",
+            (date_str,)
+        ).fetchall()
+    result = []
+    for r in rows:
+        dur = _interval_minutes(r['start_date'], r['end_date'])
+        result.append({'type': r['type'], 'value': r['value'],
+                       'unit': r['unit'], 'dur_min': int(dur)})
+    return result[:5]
+
+
+# ── Resumen del día (dashboard) ───────────────────────────────────────────────
+def get_today_summary(date_str: str | None = None) -> dict | None:
+    if not DB_FILE.exists():
+        return None
+    date_str = date_str or datetime.now().strftime('%Y-%m-%d')
+    return {
+        'date':        date_str,
+        'steps':       get_steps_for_day(date_str),
+        'distance_km': round(get_distance_km(date_str), 2),
+        'calories':    get_calories(date_str),
+    }
+
+
+# ── Rango de fechas disponibles ───────────────────────────────────────────────
+def get_available_dates() -> dict:
+    if not DB_FILE.exists():
+        return {}
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT MIN(date_day), MAX(date_day) FROM records WHERE date_day!=""'
+        ).fetchone()
+    return {'date_min': row[0] or '', 'date_max': row[1] or ''}
+
+
+# ── Debug ─────────────────────────────────────────────────────────────────────
+def debug_type_sample(type_str: str, limit: int = 5) -> list[dict]:
+    if not DB_FILE.exists():
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT type, value, value_str, unit, start_date, date_day '
+            'FROM records WHERE type=? ORDER BY start_date DESC LIMIT ?',
+            (type_str, limit)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ── Métricas adicionales ──────────────────────────────────────────────────────
+
+def _avg_numeric(date_str: str, hk_type: str) -> float | None:
+    if not DB_FILE.exists():
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT AVG(value) FROM records WHERE type=? AND date_day=? AND value IS NOT NULL',
+            (hk_type, date_str)
+        ).fetchone()
+    v = row[0] if row else None
+    return round(v, 1) if v is not None else None
+
+def _last_numeric(date_str: str, hk_type: str) -> float | None:
+    if not DB_FILE.exists():
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT value FROM records WHERE type=? AND date_day=? AND value IS NOT NULL '
+            'ORDER BY start_date DESC LIMIT 1',
+            (hk_type, date_str)
+        ).fetchone()
+    return round(row[0], 1) if row and row[0] is not None else None
+
+def _count_records(date_str: str, hk_type: str) -> int:
+    if not DB_FILE.exists():
+        return 0
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT COUNT(*) FROM records WHERE type=? AND date_day=?',
+            (hk_type, date_str)
+        ).fetchone()
+    return row[0] if row else 0
+
+def _series_numeric(date_str: str, hk_type: str, limit: int = 48) -> list:
+    if not DB_FILE.exists():
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date LIMIT ?',
+            (hk_type, date_str, limit)
+        ).fetchall()
+    return [{'i': i, 'v': round(r['value'], 1), 't': r['start_date'][11:16]}
+            for i, r in enumerate(rows)]
+
+def _steps_by_hour(date_str: str) -> list:
+    """Pasos agrupados por hora del día, para la gráfica de barras."""
+    if not DB_FILE.exists():
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date',
+            ('HKQuantityTypeIdentifierStepCount', date_str)
+        ).fetchall()
+    hourly = {}
+    for r in rows:
+        try:
+            h = int(r['start_date'][11:13])
+            hourly[h] = hourly.get(h, 0) + r['value']
+        except Exception:
+            pass
+    # Rellenar horas vacías con 0 entre la primera y la última con datos
+    if not hourly:
+        return []
+    h_min, h_max = min(hourly), max(hourly)
+    return [{'h': h, 'v': round(hourly.get(h, 0))} for h in range(h_min, h_max+1)]
+
+
+def _spo2_stats(date_str: str) -> dict:
+    """SpO2 en %, con min/max para el intervalo. Apple guarda en fracción (0.95 = 95%)."""
+    if not DB_FILE.exists():
+        return {}
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date',
+            ('HKQuantityTypeIdentifierOxygenSaturation', date_str)
+        ).fetchall()
+    if not rows:
+        return {}
+    vals = [r['value'] * 100 for r in rows]   # fracción → porcentaje
+    series = [{'i': i, 'v': round(r['value']*100, 1), 't': r['start_date'][11:16]}
+              for i, r in enumerate(rows)]
+    return {
+        'avg':    round(sum(vals)/len(vals), 1),
+        'min':    round(min(vals), 1),
+        'max':    round(max(vals), 1),
+        'series': series,
+    }
+
+
+def get_extra_metrics(date_str: str) -> dict:
+    """Todas las métricas del panel secundario."""
+    floors    = int(_sum_numeric(date_str, {'HKQuantityTypeIdentifierFlightsClimbed'}))
+    spo2      = _spo2_stats(date_str)
+    daylight  = _avg_numeric(date_str, 'HKQuantityTypeIdentifierTimeInDaylight')
+    hr_walk   = _avg_numeric(date_str, 'HKQuantityTypeIdentifierWalkingHeartRateAverage')
+    breath_dist = _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances')
+    resp_rate = _avg_numeric(date_str, 'HKQuantityTypeIdentifierRespiratoryRate')
+    wrist_temp= _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleSleepingWristTemperature')
+    steadiness= _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleWalkingSteadiness')
+    hr_recov  = _last_numeric(date_str, 'HKQuantityTypeIdentifierHeartRateRecoveryOneMinute')
+    vo2max    = _last_numeric(date_str, 'HKQuantityTypeIdentifierVO2Max')
+    noise_env = _avg_numeric(date_str, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure')
+    noise_hp  = _avg_numeric(date_str, 'HKQuantityTypeIdentifierHeadphoneAudioExposure')
+    water     = _sum_numeric(date_str, {'HKQuantityTypeIdentifierDietaryWater'})
+    bmi       = _last_numeric(date_str, 'HKQuantityTypeIdentifierBodyMassIndex')
+    handwash  = _count_records(date_str, 'HKCategoryTypeIdentifierHandwashingEvent')
+    # ECG — solo contar si hay registros ese día
+    ecg_count = _count_records(date_str, 'HKDataTypeECG')
+    # Respiración nocturna — serie
+    resp_series = _series_numeric(date_str, 'HKQuantityTypeIdentifierRespiratoryRate', 24)
+
+    return {
+        'floors':       floors or None,
+        'spo2':         spo2,           # dict con avg/min/max/series
+        'daylight_min': daylight,       # min
+        'hr_walk':      hr_walk,        # PPM
+        'breath_dist':  breath_dist,    # alteraciones/h
+        'resp_rate':    resp_rate,      # rpm
+        'wrist_temp':   wrist_temp,     # ºC
+        'steadiness':   steadiness,     # %
+        'hr_recov':     hr_recov,       # PPM
+        'vo2max':       vo2max,         # mL/min·kg
+        'noise_env':    noise_env,      # dB
+        'noise_hp':     noise_hp,       # dB
+        'water_ml':     int(water) if water else None,
+        'bmi':          bmi,
+        'handwash':     handwash or None,
+        'ecg_count':    ecg_count or None,
+        'resp_series':  resp_series,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PANEL COMPLETO — todas las métricas organizadas por categoría
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _metric(date_str: str, hk_type: str, agg: str = 'avg',
+            multiplier: float = 1.0, decimals: int = 1) -> dict:
+    """
+    Devuelve un dict con value, min, max y series para un tipo HK.
+    agg: 'avg' | 'sum' | 'last' | 'count'
+    """
+    if not DB_FILE.exists():
+        return {'value': None, 'min': None, 'max': None, 'series': []}
+
+    with get_conn() as conn:
+        if agg == 'count':
+            row = conn.execute(
+                'SELECT COUNT(*) FROM records WHERE type=? AND date_day=?',
+                (hk_type, date_str)
+            ).fetchone()
+            val = row[0] if row else 0
+            return {'value': val if val else None, 'min': None, 'max': None, 'series': []}
+
+        rows = conn.execute(
+            'SELECT value, start_date FROM records '
+            'WHERE type=? AND date_day=? AND value IS NOT NULL ORDER BY start_date',
+            (hk_type, date_str)
+        ).fetchall()
+
+    if not rows:
+        return {'value': None, 'min': None, 'max': None, 'series': []}
+
+    vals = [r['value'] * multiplier for r in rows]
+
+    if agg == 'sum':
+        value = sum(vals)
+    elif agg == 'last':
+        value = vals[-1]
+    elif agg == 'avg':
+        value = sum(vals) / len(vals)
+    else:
+        value = vals[0]
+
+    # Serie horaria (máx 48 puntos, agrupados por hora)
+    hourly: dict[int, list] = {}
+    for r in rows:
+        try:
+            h = int(r['start_date'][11:13])
+            hourly.setdefault(h, []).append(r['value'] * multiplier)
+        except Exception:
+            pass
+    series = [{'h': h, 'v': round(sum(v)/len(v), decimals)}
+              for h, v in sorted(hourly.items())]
+
+    return {
+        'value':    round(value, decimals),
+        'min':      round(min(vals), decimals),
+        'max':      round(max(vals), decimals),
+        'series':   series,
+        'count':    len(vals),
+    }
+
+
+def get_all_metrics(date_str: str) -> dict:
+    """
+    Devuelve TODAS las métricas del día agrupadas por categoría.
+    Solo consulta tipos que existen en la BD.
+    """
+    d = date_str
+
+    # ── Actividad ──────────────────────────────────────────────────────────────
+    actividad = {
+        'pasos':          {**_metric(d, 'HKQuantityTypeIdentifierStepCount', 'sum', 1, 0),
+                          'series': _steps_by_hour(d)},
+        'cal_activas':    _metric(d, 'HKQuantityTypeIdentifierActiveEnergyBurned',   'sum', 1, 0),
+        'cal_basales':    _metric(d, 'HKQuantityTypeIdentifierBasalEnergyBurned',    'sum', 1, 0),
+        'distancia':      _metric(d, 'HKQuantityTypeIdentifierDistanceWalkingRunning','sum', 1, 2),
+        'distancia_cicl': _metric(d, 'HKQuantityTypeIdentifierDistanceCycling',      'sum', 1, 2),
+        'pisos':          _metric(d, 'HKQuantityTypeIdentifierFlightsClimbed',       'sum', 1, 0),
+        'ejercicio_min':  _metric(d, 'HKQuantityTypeIdentifierAppleExerciseTime',    'sum', 1, 0),
+        'de_pie_min':     _metric(d, 'HKQuantityTypeIdentifierAppleStandTime',       'sum', 1, 0),
+        'de_pie_horas':   _metric(d, 'HKCategoryTypeIdentifierAppleStandHour',       'count'),
+        'esfuerzo_fis':   _metric(d, 'HKQuantityTypeIdentifierPhysicalEffort',       'avg', 1, 2),
+        'luz_diurna':     _metric(d, 'HKQuantityTypeIdentifierTimeInDaylight',       'sum', 1, 0),
+    }
+
+    # ── Corazón ────────────────────────────────────────────────────────────────
+    corazon = {
+        'fc':             {**_metric(d, 'HKQuantityTypeIdentifierHeartRate', 'avg', 1, 0),
+                          'raw': _series_numeric(d, 'HKQuantityTypeIdentifierHeartRate', 2000)},
+        'fc_reposo':      _metric(d, 'HKQuantityTypeIdentifierRestingHeartRate',        'avg', 1, 0),
+        'fc_caminar':     _metric(d, 'HKQuantityTypeIdentifierWalkingHeartRateAverage', 'avg', 1, 0),
+        'hrv':            _metric(d, 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN','avg', 1, 1),
+        'fc_recuperacion':_metric(d, 'HKQuantityTypeIdentifierHeartRateRecoveryOneMinute','last',1, 0),
+    }
+
+    # ── Respiración y O₂ ──────────────────────────────────────────────────────
+    respiracion = {
+        'frec_resp':      _metric(d, 'HKQuantityTypeIdentifierRespiratoryRate',                  'avg', 1, 1),
+        'spo2':           _metric(d, 'HKQuantityTypeIdentifierOxygenSaturation',                 'avg', 100, 1),  # fracción→%
+        'spo2_min':       None,  # calculado abajo
+        'spo2_max':       None,
+        'alter_resp':     _metric(d, 'HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances','avg', 1, 1),
+        'vo2max':         _metric(d, 'HKQuantityTypeIdentifierVO2Max',                           'last',1, 1),
+    }
+    # SpO2 min/max también en %
+    spo2_raw = respiracion['spo2']
+    if spo2_raw['min'] is not None:
+        respiracion['spo2']['min'] = round(spo2_raw['min'], 1)
+        respiracion['spo2']['max'] = round(spo2_raw['max'], 1)
+        # Corregir series que ya vienen multiplicadas
+        respiracion['spo2']['series'] = [
+            {'h': s['h'], 'v': round(s['v'], 1)} for s in spo2_raw['series']
+        ]
+
+    # ── Marcha y movilidad ─────────────────────────────────────────────────────
+    marcha = {
+        'velocidad':      _metric(d, 'HKQuantityTypeIdentifierWalkingSpeed',               'avg', 1, 2),
+        'longitud_zanca': _metric(d, 'HKQuantityTypeIdentifierWalkingStepLength',           'avg', 1, 1),
+        'doble_apoyo':    _metric(d, 'HKQuantityTypeIdentifierWalkingDoubleSupportPercentage','avg',1, 1),
+        'asimetria':      _metric(d, 'HKQuantityTypeIdentifierWalkingAsymmetryPercentage',  'avg', 1, 1),
+        'estabilidad':    _metric(d, 'HKQuantityTypeIdentifierAppleWalkingSteadiness',      'avg', 100, 1),  # fracción→%
+        'vel_subida':     _metric(d, 'HKQuantityTypeIdentifierStairAscentSpeed',            'avg', 1, 2),
+        'vel_bajada':     _metric(d, 'HKQuantityTypeIdentifierStairDescentSpeed',           'avg', 1, 2),
+        'test_6min':      _metric(d, 'HKQuantityTypeIdentifierSixMinuteWalkTestDistance',   'last',1, 0),
+    }
+
+    # ── Cuerpo — usa último valor disponible (pueden ser datos de días pasados) ──
+    def _body_metric(hk_type: str, mult: float = 1.0, dec: int = 1) -> dict:
+        """
+        Busca el último registro de un tipo corporal en cualquier fecha <= date_str.
+        Añade 'stale_date' si el dato no es de hoy, para mostrar advertencia.
+        """
+        if not DB_FILE.exists():
+            return {'value': None, 'stale_date': None}
+        with get_conn() as conn:
+            row = conn.execute(
+                'SELECT value, date_day FROM records '
+                'WHERE type=? AND value IS NOT NULL AND date_day<=? '
+                'ORDER BY date_day DESC, start_date DESC LIMIT 1',
+                (hk_type, date_str)
+            ).fetchone()
+        if not row or row['value'] is None:
+            return {'value': None, 'stale_date': None}
+        stale = row['date_day'] if row['date_day'] != date_str else None
+        return {
+            'value':      round(row['value'] * mult, dec),
+            'min':        None, 'max': None, 'series': [],
+            'stale_date': stale,
+        }
+
+    cuerpo = {
+        'peso':       _body_metric('HKQuantityTypeIdentifierBodyMass',           1,   1),
+        'altura':     _body_metric('HKQuantityTypeIdentifierHeight',             1,   1),
+        'imc':        _body_metric('HKQuantityTypeIdentifierBodyMassIndex',      1,   1),
+        'grasa':      _body_metric('HKQuantityTypeIdentifierBodyFatPercentage',  100, 1),
+        'masa_magra': _body_metric('HKQuantityTypeIdentifierLeanBodyMass',       1,   1),
+        'cintura':    _body_metric('HKQuantityTypeIdentifierWaistCircumference', 1,   1),
+    }
+
+    # ── Sueño ──────────────────────────────────────────────────────────────────
+    # get_sleep_day ya devuelve el resumen procesado
+    sueño_raw = get_sleep_day(date_str)
+
+    # ── Audio ──────────────────────────────────────────────────────────────────
+    audio = {
+        'ruido_env':      _metric(d, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure', 'avg', 1, 1),
+        'ruido_auri':     _metric(d, 'HKQuantityTypeIdentifierHeadphoneAudioExposure',     'avg', 1, 1),
+        'eventos_audio':  _metric(d, 'HKCategoryTypeIdentifierAudioExposureEvent',         'count'),
+    }
+
+    # ── Temperatura (sueño) ────────────────────────────────────────────────────
+    temp_muneca = _metric(d, 'HKQuantityTypeIdentifierAppleSleepingWristTemperature', 'avg', 1, 2)
+
+    # ── Nutrición e higiene ────────────────────────────────────────────────────
+    otros = {
+        'agua':           _metric(d, 'HKQuantityTypeIdentifierDietaryWater',          'sum', 1, 0),
+        'lavado_manos':   _metric(d, 'HKCategoryTypeIdentifierHandwashingEvent',       'count'),
+    }
+
+    return {
+        'actividad':   actividad,
+        'corazon':     corazon,
+        'respiracion': respiracion,
+        'marcha':      marcha,
+        'cuerpo':      cuerpo,
+        'sueno':       sueño_raw,
+        'audio':       audio,
+        'animo': {
+            'estado_animo': _metric(d, 'HKStateOfMindLabel',                              'last', 1, 0),
+            'ansiedad':     _metric(d, 'HKCategoryTypeIdentifierGeneralizedAnxietyDisorder','last',1, 0),
+            'depresion':    _metric(d, 'HKCategoryTypeIdentifierDepressionRisk',           'last',1, 0),
+        },
+        'temp_muneca': temp_muneca,
+        'otros':       otros,
+    }
+
+
+# ── Puntuación de recuperación y tendencia VO₂ ────────────────────────────────
+
+def get_recovery_score(date_str: str) -> dict | None:
+    """
+    Puntuación de recuperación 0-100 basada en HRV, FC reposo y sueño.
+    Algoritmo similar al Body Battery de Garmin.
+    """
+    if not DB_FILE.exists():
+        return None
+
+    # Valores del día
+    hrv_today = _avg_numeric(date_str, 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN')
+    rhr_today = _avg_numeric(date_str, 'HKQuantityTypeIdentifierRestingHeartRate')
+    sleep     = get_sleep_day(date_str)
+    sleep_min = sleep.get('total_min', 0) if sleep else 0
+
+    if not hrv_today and not rhr_today:
+        return None
+
+    # Línea base: media de los últimos 30 días
+    dt = datetime.strptime(date_str, '%Y-%m-%d')
+    d30 = (dt - timedelta(days=30)).strftime('%Y-%m-%d')
+
+    with get_conn() as conn:
+        hrv_base = conn.execute(
+            'SELECT AVG(value) FROM records '
+            'WHERE type=? AND date_day>=? AND date_day<? AND value IS NOT NULL',
+            ('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', d30, date_str)
+        ).fetchone()[0]
+        rhr_base = conn.execute(
+            'SELECT AVG(value) FROM records '
+            'WHERE type=? AND date_day>=? AND date_day<? AND value IS NOT NULL',
+            ('HKQuantityTypeIdentifierRestingHeartRate', d30, date_str)
+        ).fetchone()[0]
+
+    if not hrv_base and not rhr_base:
+        return None
+
+    score = 50.0  # base
+
+    # HRV: más alto = mejor recuperación (+/- 25 puntos)
+    if hrv_today and hrv_base:
+        hrv_ratio = hrv_today / hrv_base
+        score += (hrv_ratio - 1) * 50  # ±25 puntos por ±50% de desviación
+
+    # FC reposo: más baja = mejor (+/- 20 puntos)
+    if rhr_today and rhr_base:
+        rhr_ratio = rhr_today / rhr_base
+        score -= (rhr_ratio - 1) * 40  # sube FC = baja score
+
+    # Sueño: 7-9h = óptimo (+/- 20 puntos)
+    if sleep_min:
+        sleep_h = sleep_min / 60
+        if sleep_h >= 7:
+            score += min(20, (sleep_h - 7) * 10)
+        else:
+            score -= (7 - sleep_h) * 15
+
+    score = max(0, min(100, round(score)))
+
+    # Clasificación
+    if score >= 80:
+        label, color = 'Excelente', '#34c759'
+    elif score >= 65:
+        label, color = 'Buena', '#30b0c7'
+    elif score >= 45:
+        label, color = 'Normal', '#ff9500'
+    elif score >= 25:
+        label, color = 'Baja', '#ff6b3d'
+    else:
+        label, color = 'Muy baja', '#ff3b5c'
+
+    return {
+        'score': score,
+        'label': label,
+        'color': color,
+        'hrv_today':  round(hrv_today, 1) if hrv_today else None,
+        'hrv_base':   round(hrv_base,  1) if hrv_base  else None,
+        'rhr_today':  round(rhr_today, 0) if rhr_today else None,
+        'rhr_base':   round(rhr_base,  0) if rhr_base  else None,
+        'sleep_h':    round(sleep_min / 60, 1) if sleep_min else None,
+    }
+
+
+def get_vo2_trend(date_str: str, days: int = 90) -> list[dict]:
+    """VO₂ máx de los últimos N días."""
+    if not DB_FILE.exists():
+        return []
+    dt     = datetime.strptime(date_str, '%Y-%m-%d')
+    d_from = (dt - timedelta(days=days)).strftime('%Y-%m-%d')
+    with get_conn() as conn:
+        rows = conn.execute(
+            'SELECT date_day, AVG(value) as v FROM records '
+            'WHERE type=? AND date_day>=? AND date_day<=? AND value IS NOT NULL '
+            'GROUP BY date_day ORDER BY date_day',
+            ('HKQuantityTypeIdentifierVO2Max', d_from, date_str)
+        ).fetchall()
+    return [{'date': r['date_day'], 'v': round(r['v'], 1)} for r in rows]
+
+
+# ── Histórico ─────────────────────────────────────────────────────────────────
+
+def get_history_compare(metric: str, period: str) -> dict:
+    """Devuelve datos del período actual Y del período anterior para comparativa."""
+    current  = get_history(metric, period)
+    previous = get_history(metric, period, offset=1)
+    return {'current': current, 'previous': previous}
+
+
+def get_history(metric: str, period: str, offset: int = 0) -> list[dict]:
+    """
+    Devuelve serie histórica agrupada por día/semana/mes.
+    metric: 'steps'|'calories'|'distance'|'hr'|'rhr'|'hrv'|'sleep'|
+            'weight'|'floors'|'resp'|'spo2'|'vo2'|'effort'|'daylight'
+    period: 'week'|'month'|'year'|'all'
+    """
+    if not DB_FILE.exists():
+        return []
+
+    TYPES = {
+        'steps':    ('HKQuantityTypeIdentifierStepCount',                 'sum'),
+        'calories': ('HKQuantityTypeIdentifierActiveEnergyBurned',        'sum'),
+        'distance': ('HKQuantityTypeIdentifierDistanceWalkingRunning',    'sum'),
+        'hr':       ('HKQuantityTypeIdentifierHeartRate',                 'avg'),
+        'rhr':      ('HKQuantityTypeIdentifierRestingHeartRate',          'avg'),
+        'hrv':      ('HKQuantityTypeIdentifierHeartRateVariabilitySDNN',  'avg'),
+        'sleep':    ('HKCategoryTypeIdentifierSleepAnalysis',             'sleep'),
+        'weight':   ('HKQuantityTypeIdentifierBodyMass',                  'avg'),
+        'floors':   ('HKQuantityTypeIdentifierFlightsClimbed',            'sum'),
+        'resp':     ('HKQuantityTypeIdentifierRespiratoryRate',           'avg'),
+        'spo2':     ('HKQuantityTypeIdentifierOxygenSaturation',         'avg'),
+        'vo2':      ('HKQuantityTypeIdentifierVO2Max',                    'avg'),
+        'effort':   ('HKQuantityTypeIdentifierPhysicalEffort',            'avg'),
+        'daylight': ('HKQuantityTypeIdentifierTimeInDaylight',            'sum'),
+    }
+
+    if metric not in TYPES:
+        return []
+
+    hk_type, agg = TYPES[metric]
+
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    if period == 'week':
+        since = (today - timedelta(days=7)).isoformat()
+        group = 'day'
+    elif period == 'month':
+        since = (today - timedelta(days=30)).isoformat()
+        group = 'day'
+    elif period == 'year':
+        since = (today - timedelta(days=365)).isoformat()
+        group = 'week'
+    else:  # all
+        since = '2000-01-01'
+        group = 'month'
+
+    with get_conn() as conn:
+        if agg == 'sleep':
+            # Sueño: sumar minutos dormidos por día
+            rows = conn.execute(
+                "SELECT date_day, SUM("
+                "  CASE WHEN (end_date - start_date) > 0 "
+                "  THEN (julianday(substr(end_date,1,19)) - julianday(substr(start_date,1,19))) * 1440 "
+                "  ELSE 0 END"
+                ") as v FROM records "
+                "WHERE type=? AND date_day>=? "
+                "AND value_str NOT LIKE '%InBed%' "
+                "AND value_str NOT LIKE '%Awake%' "
+                "GROUP BY date_day ORDER BY date_day",
+                (hk_type, since)
+            ).fetchall()
+            days = [{'date': r['date_day'], 'v': round(float(r['v'] or 0) / 60, 1)} for r in rows]
+        elif agg == 'sum':
+            rows = conn.execute(
+                'SELECT date_day, SUM(value) as v FROM records '
+                'WHERE type=? AND date_day>=? AND value IS NOT NULL '
+                'GROUP BY date_day ORDER BY date_day',
+                (hk_type, since)
+            ).fetchall()
+            days = [{'date': r['date_day'], 'v': round(float(r['v'] or 0), 1)} for r in rows]
+        else:  # avg
+            rows = conn.execute(
+                'SELECT date_day, AVG(value) as v FROM records '
+                'WHERE type=? AND date_day>=? AND value IS NOT NULL '
+                'GROUP BY date_day ORDER BY date_day',
+                (hk_type, since)
+            ).fetchall()
+            days = [{'date': r['date_day'], 'v': round(float(r['v'] or 0), 1)} for r in rows]
+
+    if not days:
+        return []
+
+    if group == 'day':
+        return days
+
+    # Agrupar por semana o mes
+    from collections import defaultdict
+    buckets: dict = defaultdict(list)
+    for d in days:
+        dt = datetime.strptime(d['date'], '%Y-%m-%d')
+        if group == 'week':
+            key = dt.strftime('%Y-W%W')
+            label = dt.strftime('%d %b')
+        else:  # month
+            key = dt.strftime('%Y-%m')
+            label = dt.strftime('%b %Y')
+        buckets[(key, label)].append(d['v'])
+
+    result = []
+    for (key, label), vals in sorted(buckets.items()):
+        if agg == 'sum':
+            v = round(sum(vals), 1)
+        else:
+            v = round(sum(vals) / len(vals), 1)
+        result.append({'date': key, 'label': label, 'v': v})
+    return result
+
+
+# ── Histórico ──────────────────────────────────────────────────────────────────
+
+def get_history_compare(metric: str, period: str) -> dict:
+    """Devuelve datos del período actual Y del período anterior para comparativa."""
+    current  = get_history(metric, period)
+    previous = get_history(metric, period, offset=1)
+    return {'current': current, 'previous': previous}
+
+
+def get_history(metric: str, period: str, offset: int = 0) -> list[dict]:
+    """
+    Devuelve series históricas agrupadas por día/semana/mes.
+    metric: 'pasos'|'calorias'|'distancia'|'fc'|'fc_reposo'|'hrv'|'spo2'|
+            'sueno'|'peso'|'pisos'|'resp'|'esfuerzo'|'luz'
+    period: 'week'|'month'|'year'|'all'
+    """
+    if not DB_FILE.exists():
+        return []
+
+    from datetime import datetime, timedelta
+
+    TYPES = {
+        'pasos':      ('HKQuantityTypeIdentifierStepCount',                   'sum'),
+        'calorias':   ('HKQuantityTypeIdentifierActiveEnergyBurned',          'sum'),
+        'distancia':  ('HKQuantityTypeIdentifierDistanceWalkingRunning',       'sum'),
+        'fc':         ('HKQuantityTypeIdentifierHeartRate',                   'avg'),
+        'fc_reposo':  ('HKQuantityTypeIdentifierRestingHeartRate',            'avg'),
+        'hrv':        ('HKQuantityTypeIdentifierHeartRateVariabilitySDNN',    'avg'),
+        'spo2':       ('HKQuantityTypeIdentifierOxygenSaturation',            'avg'),
+        'sueno':      ('HKCategoryTypeIdentifierSleepAnalysis',               'sum'),
+        'peso':       ('HKQuantityTypeIdentifierBodyMass',                    'avg'),
+        'pisos':      ('HKQuantityTypeIdentifierFlightsClimbed',              'sum'),
+        'resp':       ('HKQuantityTypeIdentifierRespiratoryRate',             'avg'),
+        'esfuerzo':   ('HKQuantityTypeIdentifierPhysicalEffort',              'avg'),
+        'luz':        ('HKQuantityTypeIdentifierTimeInDaylight',              'sum'),
+        'vo2':        ('HKQuantityTypeIdentifierVO2Max',                      'avg'),
+    }
+
+    if metric not in TYPES:
+        return []
+
+    hk_type, agg = TYPES[metric]
+
+    now = datetime.now()
+    if offset > 0:
+        if period == 'week':   now = now - timedelta(days=7*offset)
+        elif period == 'month': now = now - timedelta(days=30*offset)
+        elif period == 'year':  now = now - timedelta(days=365*offset)
+        else: now = now - timedelta(days=365*offset)
+    if period == 'week':
+        date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+        group_by  = 'date_day'          # un punto por día
+    elif period == 'month':
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+        group_by  = 'date_day'
+    elif period == 'year':
+        date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+        group_by  = "strftime('%Y-%W', date_day)"   # un punto por semana
+    else:  # all
+        date_from = '2000-01-01'
+        group_by  = "strftime('%Y-%m', date_day)"   # un punto por mes
+
+    date_to = now.strftime('%Y-%m-%d')
+
+    # Sueño: contar sólo minutos dormidos (no InBed)
+    if metric == 'sueno':
+        # Calcular duración en Python para evitar problemas con zona horaria en SQLite
+        from datetime import datetime as _dt, timedelta as _td
+        from collections import defaultdict
+
+        try:
+            d_from_ext = (_dt.strptime(date_from,'%Y-%m-%d') - _td(days=1)).strftime('%Y-%m-%d')
+        except Exception:
+            d_from_ext = date_from
+
+        with get_conn() as conn:
+            rows = conn.execute(
+                'SELECT substr(start_date,1,19) as s, substr(end_date,1,19) as e, '
+                'substr(end_date,1,10) as g '
+                'FROM records '
+                'WHERE type=? AND date_day>=? AND date_day<=? '
+                "AND value_str NOT LIKE '%InBed%' "
+                "AND value_str NOT LIKE '%Awake%' "
+                'ORDER BY start_date',
+                (hk_type, d_from_ext, date_to)
+            ).fetchall()
+
+        # Calcular minutos en Python
+        daily = defaultdict(float)
+        for r in rows:
+            try:
+                s = _dt.strptime(r['s'], '%Y-%m-%d %H:%M:%S')
+                e = _dt.strptime(r['e'], '%Y-%m-%d %H:%M:%S')
+                mins = (e - s).total_seconds() / 60
+                if mins > 0:
+                    daily[r['g']] += mins
+            except Exception:
+                pass
+
+        # Filtrar siestas cortas — solo sueño nocturno principal (>3h)
+        daily = {k: v for k, v in daily.items() if v > 180}
+
+        if period in ('year', 'all'):
+            fmt = '%Y-%W' if period == 'year' else '%Y-%m'
+            grouped = defaultdict(list)
+            for date_str, mins in daily.items():
+                try:
+                    key = _dt.strptime(date_str, '%Y-%m-%d').strftime(fmt)
+                    grouped[key].append(mins / 60)
+                except Exception:
+                    pass
+            return [{'date': k, 'v': round(sum(vs)/len(vs), 2)} for k, vs in sorted(grouped.items())]
+
+        return [{'date': k, 'v': round(v/60, 2)} for k, v in sorted(daily.items())]
+
+    agg_fn = 'SUM(value)' if agg == 'sum' else 'AVG(value)'
+
+    with get_conn() as conn:
+        rows = conn.execute(f"""
+            SELECT {group_by} as g, {agg_fn} as v
+            FROM records
+            WHERE type = ?
+              AND date_day >= ? AND date_day <= ?
+              AND value IS NOT NULL
+            GROUP BY g ORDER BY g
+        """, (hk_type, date_from, date_to)).fetchall()
+        # Peso: si no hay datos en el período, coger el último valor conocido
+        if metric == 'peso' and not rows:
+            last = conn.execute(
+                'SELECT date_day as g, AVG(value) as v FROM records '
+                'WHERE type=? AND value IS NOT NULL '
+                'ORDER BY date_day DESC LIMIT 1', (hk_type,)
+            ).fetchone()
+            if last and last['v']:
+                rows = [last]
+
+    mult = 1
+    if metric == 'distancia':  mult = 0.001   # m → km
+    if metric == 'spo2':       mult = 100      # 0-1 → %
+
+    results = []
+    for r in rows:
+        if r['v'] is None: continue
+        v = round(r['v'] * mult, 2)
+        # Umbrales mínimos por métrica para excluir ruido
+        min_threshold = 0.5 if metric == 'distancia' else 0.01
+        if v < min_threshold: continue
+        results.append({'date': r['g'], 'v': v})
+    return results

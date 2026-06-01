@@ -1,0 +1,2180 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+{% if stats %}
+
+<div class="dash-header">
+  <div class="dash-title-block">
+    <h1 class="dash-title">Resumen de Salud</h1>
+    <p class="dash-subtitle" id="dash-date-label">cargando…</p>
+  </div>
+
+  <div class="date-nav">
+    <button class="date-arrow" id="btn-prev">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="date-picker-wrap" id="date-picker-wrap">
+      <div class="date-display" id="date-display-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;stroke:var(--muted);flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span id="dd-label">—</span>
+        <svg class="date-caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="date-dropdown" id="date-dropdown">
+        <div class="cal-header">
+          <button class="cal-nav" id="cal-prev-month"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <div class="cal-month-year">
+            <select id="cal-month-sel"></select>
+            <select id="cal-year-sel"></select>
+          </div>
+          <button class="cal-nav" id="cal-next-month"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <div class="cal-weekdays"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-footer"><button class="cal-today-btn" id="cal-today-btn">Ir a hoy</button></div>
+      </div>
+    </div>
+    <button class="date-arrow" id="btn-next">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+    <button class="date-today" id="btn-today">hoy</button>
+    <button class="pdf-export-btn" onclick="exportDayPDF()" title="Exportar resumen del día en PDF">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      PDF
+    </button>
+  </div>
+</div>
+
+<div class="dash-summary">
+
+  {# Fila 1: Actividad + métricas clave #}
+  <div class="ds-top">
+
+    {# Anillos #}
+    <div class="ds-rings-block">
+      <canvas id="rings-canvas" width="120" height="120"></canvas>
+      <div class="ds-rings-legend">
+        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#ff3b5c"></span><span class="ds-rl-key">Mov.</span><span class="ds-rl-val" id="act-move" style="color:#ff3b5c">—</span></div>
+        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#34c759"></span><span class="ds-rl-key">Ej.</span><span class="ds-rl-val" id="act-ex" style="color:#34c759">—</span></div>
+        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#30b0c7"></span><span class="ds-rl-key">Pie</span><span class="ds-rl-val" id="act-stand" style="color:#30b0c7">—</span></div>
+      </div>
+    </div>
+
+    {# Métricas principales en grid #}
+    <div class="ds-metrics-grid">
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">Pasos</div>
+        <div class="ds-mc-value"><span id="steps-num">—</span><span class="ds-mc-unit">pasos</span></div>
+        <div class="ds-mc-bar-track"><div class="ds-mc-bar-fill" id="steps-bar" style="width:0%;background:#ff3b5c"></div></div>
+        <div class="ds-mc-foot">Meta 10.000</div>
+        <div class="ds-mc-mini"><div class="mini-bars" id="mini-bars"></div></div>
+      </div>
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">Ritmo cardíaco</div>
+        <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span>
+          <span class="ds-mc-trend" id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span>
+        </div>
+        <div class="chart-wrap" style="position:relative;margin-top:4px">
+          <canvas id="hr-chart" class="metric-chart" height="50"></canvas>
+        </div>
+        <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
+      </div>
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">Sueño</div>
+        <div class="ds-mc-value"><span id="sleep-total">—</span></div>
+        <div class="chart-wrap" style="position:relative;margin-top:6px">
+          <canvas id="sleep-chart" class="metric-chart" height="40"></canvas>
+        </div>
+        <div class="ds-mc-foot">
+          <span class="legend-dot" style="background:#1a3fa8;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px"></span>Prof
+          <span class="legend-dot" style="background:#bf5af2;width:7px;height:7px;border-radius:50%;display:inline-block;margin:0 3px"></span>REM
+          <span class="legend-dot" style="background:#63c3f5;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px"></span>Lig
+        </div>
+      </div>
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">HRV</div>
+        <div class="ds-mc-value"><span id="hrv-num">—</span><span class="ds-mc-unit">ms</span></div>
+        <div class="chart-wrap" style="position:relative;margin-top:4px">
+          <canvas id="hrv-chart" class="metric-chart" height="50"></canvas>
+        </div>
+      </div>
+
+      <div class="ds-metric-card" id="recovery-summary-card" style="display:none">
+        <div class="ds-mc-label">Recuperación</div>
+        <div class="ds-mc-value"><span id="rec-score-top" style="color:#34c759">—</span><span class="ds-mc-unit">/ 100</span></div>
+        <div style="height:6px;background:var(--surface-2);border-radius:3px;margin-top:8px;overflow:hidden">
+          <div id="rec-bar-top" style="height:100%;border-radius:3px;width:0%;transition:width 1s ease;background:#34c759"></div>
+        </div>
+        <div class="ds-mc-foot" id="rec-label-top">—</div>
+      </div>
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">Entrenamientos</div>
+        <div id="workouts-list" class="workouts-list" style="margin-top:4px">
+          <div class="workout-empty">Sin entrenamientos</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+{# ── Panel de métricas adicionales — todas las categorías ── #}
+<div class="panel-header-row">
+  <h2 class="panel-header-title">Todos los datos de salud</h2>
+</div>
+<div class="extra-panel" id="extra-panel">
+
+  {# Macro para una fila de métrica #}
+  {# id_val: id del span de valor | label | unit | tip | icon | show_range: si muestra min-max #}
+
+  {# ── ACTIVIDAD ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-actividad')">
+      <div class="extra-section-left"><span class="extra-section-icon">🏃</span><span class="extra-section-title">Actividad</span></div>
+      <svg class="extra-chevron" id="chev-sec-actividad" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-actividad">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Anillo rojo: calorías activas quemadas hoy."><div class="es-mc-top"><span class="es-mc-icon">🔴</span><span class="es-mc-label">Movimiento</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cal-activas">—</span><span class="es-mc-unit">kcal</span></div></div>
+        <div class="es-metric-card" title="Anillo verde: minutos de ejercicio de intensidad moderada o superior."><div class="es-mc-top"><span class="es-mc-icon">🟢</span><span class="es-mc-label">Ejercicio</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ejercicio-min">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Anillo azul: horas en que te pusiste de pie al menos 1 minuto."><div class="es-mc-top"><span class="es-mc-icon">🔵</span><span class="es-mc-label">De pie</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depie-horas">—</span><span class="es-mc-unit">h</span></div></div>
+        <div class="es-metric-card" title="Total de pasos registrados hoy. La OMS recomienda 8.000–10.000 pasos/día."><div class="es-mc-top"><span class="es-mc-icon">👟</span><span class="es-mc-label">Pasos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-pasos">—</span><span class="es-mc-unit">pasos</span></div></div>
+        <div class="es-metric-card" title="Kilómetros recorridos caminando o corriendo."><div class="es-mc-top"><span class="es-mc-icon">📍</span><span class="es-mc-label">Distancia</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-distancia">—</span><span class="es-mc-unit">km</span></div></div>
+        <div class="es-metric-card" title="Minutos totales de pie a lo largo del día."><div class="es-mc-top"><span class="es-mc-icon">🧍</span><span class="es-mc-label">Minutos de pie</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depie-min">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Pisos subidos hoy. Apple Watch detecta cada subida de ~3 metros."><div class="es-mc-top"><span class="es-mc-icon">🪜</span><span class="es-mc-label">Pisos subidos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-pisos">—</span><span class="es-mc-unit">pisos</span></div></div>
+        <div class="es-metric-card" title="Energía quemada en reposo (metabolismo basal)."><div class="es-mc-top"><span class="es-mc-icon">💤</span><span class="es-mc-label">Energía en reposo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cal-basales">—</span><span class="es-mc-unit">kcal</span></div></div>
+        <div class="es-metric-card" title="Esfuerzo físico medio del día. Escala 0–10."><div class="es-mc-top"><span class="es-mc-icon">💪</span><span class="es-mc-label">Esfuerzo físico</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-esfuerzo">—</span><span class="es-mc-unit">/ 10</span></div></div>
+      </div>
+
+      {# Gráfica de pasos por hora #}
+      <div class="section-chart-block" id="steps-hour-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">Pasos por hora</span>
+          <span class="section-chart-sub" id="steps-hour-sub"></span>
+        </div>
+        <div class="section-chart-wrap">
+          <canvas id="steps-hour-canvas"></canvas>
+          <div class="section-chart-tip" id="steps-hour-tip" style="display:none"></div>
+        </div>
+        <div class="section-chart-xaxis" id="steps-hour-xaxis"></div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── CORAZÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-corazon')">
+      <div class="extra-section-left"><span class="extra-section-icon">❤️</span><span class="extra-section-title">Corazón</span></div>
+      <svg class="extra-chevron" id="chev-sec-corazon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-corazon">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Media de pulsaciones por minuto a lo largo del día."><div class="es-mc-top"><span class="es-mc-icon">💓</span><span class="es-mc-label">Frecuencia cardíaca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc">—</span><span class="es-mc-unit">PPM</span><span class="mrow-range" id="m-fc-range"></span></div></div>
+        <div class="es-metric-card" title="FC mínima en reposo. Un valor bajo (40–60 PPM) indica buena forma cardiovascular."><div class="es-mc-top"><span class="es-mc-icon">💗</span><span class="es-mc-label">FC en reposo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-reposo">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="HRV: variabilidad entre latidos. Más alto = mejor recuperación y sistema nervioso autónomo más activo."><div class="es-mc-top"><span class="es-mc-icon">📊</span><span class="es-mc-label">Variabilidad FC (HRV)</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-hrv">—</span><span class="es-mc-unit">ms</span></div></div>
+        <div class="es-metric-card" title="Caída de la FC al primer minuto tras un entrenamiento. Más de 12 PPM es saludable."><div class="es-mc-top"><span class="es-mc-icon">📉</span><span class="es-mc-label">Recuperación cardíaca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-recov">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="FC media mientras caminas. Un valor elevado puede indicar menor eficiencia cardiovascular."><div class="es-mc-top"><span class="es-mc-icon">🚶</span><span class="es-mc-label">FC al caminar</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-caminar">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="VO₂ máx: máxima capacidad de consumo de oxígeno. Indicador clave de forma física aeróbica."><div class="es-mc-top"><span class="es-mc-icon">🫁</span><span class="es-mc-label">Capacidad aeróbica</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vo2">—</span><span class="es-mc-unit">mL/min·kg</span></div></div>
+        <div class="ecg-day-row es-metric-card" id="ecg-day-row" style="display:none" title="Registros de ECG tomados este día. Pulsa para ver el electrocardiograma."><div class="es-mc-top"><span class="es-mc-icon">📈</span><span class="es-mc-label">ECG</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ecg-count">—</span><span class="es-mc-unit">registros</span></div></div>
+        <div class="es-metric-card" title="SpO₂: saturación de oxígeno en sangre. Normal: 95–100%."><div class="es-mc-top"><span class="es-mc-icon">🩸</span><span class="es-mc-label">Oxígeno en sangre</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-spo2">—</span><span class="es-mc-unit">%</span><span class="mrow-range" id="m-spo2-range"></span></div></div>
+      </div>
+
+      {# Gráfica de FC a lo largo del día #}
+      <div class="section-chart-block" id="hr-day-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">Frecuencia cardíaca</span>
+          <span class="section-chart-sub" id="hr-day-sub"></span>
+        </div>
+        <div class="section-chart-wrap">
+          <canvas id="hr-day-canvas"></canvas>
+          <div class="section-chart-tip" id="hr-day-tip" style="display:none"></div>
+        </div>
+        <div class="section-chart-xaxis" id="hr-day-xaxis"></div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── RESPIRACIÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-respiracion')">
+      <div class="extra-section-left"><span class="extra-section-title">Respiración</span></div>
+      <svg class="extra-chevron" id="chev-sec-respiracion" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-respiracion">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Respiraciones por minuto. Normal en adultos: 12–20 rpm."><div class="es-mc-top"><span class="es-mc-icon">🌬️</span><span class="es-mc-label">Frecuencia respiratoria</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-resp">—</span><span class="es-mc-unit">rpm</span><span class="mrow-range" id="m-resp-range"></span></div></div>
+        <div class="es-metric-card" title="Perturbaciones respiratorias durante el sueño. Un valor alto puede indicar apnea."><div class="es-mc-top"><span class="es-mc-icon">😴</span><span class="es-mc-label">Alteraciones resp.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-alter-resp">—</span><span class="es-mc-unit">/h</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SUEÑO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-sueno')">
+      <div class="extra-section-left"><span class="extra-section-icon">🌙</span><span class="extra-section-title">Sueño</span></div>
+      <svg class="extra-chevron" id="chev-sec-sueno" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-sueno">
+
+      {# Gráfica de fases de sueño estilo Apple — ancho completo #}
+      <div class="sleep-apple-wrap" id="sleep-apple-wrap" style="display:none">
+        <div class="sleep-apple-header">
+          <div>
+            <span class="sleep-apple-total" id="sleep-apple-total">—</span>
+            <span class="sleep-apple-sublabel">tiempo de sueño</span>
+          </div>
+          <div class="sleep-apple-pills">
+            <span class="sleep-pill sp-awake"><span class="sp-dot"></span>Vigilia <b id="sp-awake">—</b></span>
+            <span class="sleep-pill sp-rem">  <span class="sp-dot"></span>REM <b id="sp-rem">—</b></span>
+            <span class="sleep-pill sp-light"><span class="sp-dot"></span>Ligero <b id="sp-light">—</b></span>
+            <span class="sleep-pill sp-deep"> <span class="sp-dot"></span>Profundo <b id="sp-deep">—</b></span>
+          </div>
+        </div>
+        <div class="sleep-apple-graph">
+          <div class="sleep-apple-labels" id="sleep-apple-labels">
+            <div>Vigilia</div>
+            <div>REM</div>
+            <div>Ligero</div>
+            <div>Profundo</div>
+          </div>
+          <div class="sleep-apple-canvas-col">
+            <canvas id="sleep-phases-canvas"></canvas>
+            <div class="sleep-x-axis" id="sleep-x-axis"></div>
+            <div class="sleep-hover-tip" id="sleep-hover-tip" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sleep-no-data" id="sleep-no-data" style="display:none;padding:20px 16px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">Sin datos de sueño para este día</div>
+
+      {# Tarjetas de resumen #}
+      <div class="es-metric-grid" style="padding-top:0">
+        <div class="es-metric-card" title="Tiempo total dormido anoche."><div class="es-mc-top"><span class="es-mc-icon">⏱️</span><span class="es-mc-label">Duración total</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-total">—</span></div></div>
+        <div class="es-metric-card" title="Sueño profundo: la fase más reparadora. Adultos: ~20% del total."><div class="es-mc-top"><span class="es-mc-icon">🟦</span><span class="es-mc-label">Sueño profundo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-deep">—</span></div></div>
+        <div class="es-metric-card" title="Sueño REM: consolidación de la memoria. Adultos: ~25% del total."><div class="es-mc-top"><span class="es-mc-icon">🟣</span><span class="es-mc-label">Sueño REM</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-rem">—</span></div></div>
+        <div class="es-metric-card" title="Temperatura de muñeca durante el sueño."><div class="es-mc-top"><span class="es-mc-icon">🌡️</span><span class="es-mc-label">Temp. muñeca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-temp-muneca">—</span><span class="es-mc-unit">°C</span></div></div>
+      </div>
+    </div>
+  </div>
+
+
+  {# ── MARCHA Y MOVILIDAD ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-marcha')">
+      <div class="extra-section-left"><span class="extra-section-icon">🦶</span><span class="extra-section-title">Marcha y movilidad</span></div>
+      <svg class="extra-chevron" id="chev-sec-marcha" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-marcha">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Longitud media del paso al caminar. Un paso más largo indica mejor movilidad y fuerza."><div class="es-mc-top"><span class="es-mc-icon">👣</span><span class="es-mc-label">Longitud del paso</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-zancada">—</span><span class="es-mc-unit">cm</span></div></div>
+        <div class="es-metric-card" title="Velocidad media al caminar en km/h. Un ritmo saludable: 4.5–5.5 km/h."><div class="es-mc-top"><span class="es-mc-icon">🚶</span><span class="es-mc-label">Velocidad marcha</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-velocidad">—</span><span class="es-mc-unit">km/h</span></div></div>
+        <div class="es-metric-card" title="Velocidad al subir escaleras. Indicador de potencia muscular en piernas."><div class="es-mc-top"><span class="es-mc-icon">⬆️</span><span class="es-mc-label">Velocidad subir esc.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vel-subida">—</span><span class="es-mc-unit">m/s</span></div></div>
+        <div class="es-metric-card" title="Velocidad al bajar escaleras. Requiere control y equilibrio."><div class="es-mc-top"><span class="es-mc-icon">⬇️</span><span class="es-mc-label">Velocidad bajar esc.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vel-bajada">—</span><span class="es-mc-unit">m/s</span></div></div>
+        <div class="es-metric-card" title="% de tiempo con ambos pies en el suelo al caminar. Más alto = marcha más cautelosa."><div class="es-mc-top"><span class="es-mc-icon">⚖️</span><span class="es-mc-label">Doble apoyo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-doble-apoyo">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Diferencia de tiempo entre pasos izquierdo y derecho. Más bajo = marcha más simétrica."><div class="es-mc-top"><span class="es-mc-icon">↔️</span><span class="es-mc-label">Asimetría marcha</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-asimetria">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Estabilidad al andar: rango 0–100%. Más alto = menor riesgo de caída."><div class="es-mc-top"><span class="es-mc-icon">🎯</span><span class="es-mc-label">Estabilidad</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-estabilidad">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Distancia recorrida en 6 minutos. Test clínico de capacidad funcional."><div class="es-mc-top"><span class="es-mc-icon">🏁</span><span class="es-mc-label">Marcha 6 minutos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-test6min">—</span><span class="es-mc-unit">m</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── CUERPO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-cuerpo')">
+      <div class="extra-section-left"><span class="extra-section-icon">⚖️</span><span class="extra-section-title">Cuerpo</span></div>
+      <svg class="extra-chevron" id="chev-sec-cuerpo" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-cuerpo">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Peso corporal."><div class="es-mc-top"><span class="es-mc-icon">⚖️</span><span class="es-mc-label">Peso</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-peso">—</span><span class="es-mc-unit">kg</span></div></div>
+        <div class="es-metric-card" title="Altura."><div class="es-mc-top"><span class="es-mc-icon">📏</span><span class="es-mc-label">Altura</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-altura">—</span><span class="es-mc-unit">cm</span></div></div>
+        <div class="es-metric-card" title="Índice de masa corporal. Normal: 18.5–24.9."><div class="es-mc-top"><span class="es-mc-icon">📊</span><span class="es-mc-label">IMC</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-imc">—</span><span class="es-mc-unit">kg/m²</span></div></div>
+        <div class="es-metric-card" title="Porcentaje de grasa corporal."><div class="es-mc-top"><span class="es-mc-icon">🫀</span><span class="es-mc-label">% grasa</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-grasa">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Masa muscular y ósea sin grasa."><div class="es-mc-top"><span class="es-mc-icon">💪</span><span class="es-mc-label">Masa magra</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-masa-magra">—</span><span class="es-mc-unit">kg</span></div></div>
+        <div class="es-metric-card" title="Perímetro de cintura."><div class="es-mc-top"><span class="es-mc-icon">📐</span><span class="es-mc-label">Cintura</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cintura">—</span><span class="es-mc-unit">cm</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SALUD GENERAL ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-general')">
+      <div class="extra-section-left"><span class="extra-section-icon">🌿</span><span class="extra-section-title">Salud general</span></div>
+      <svg class="extra-chevron" id="chev-sec-general" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-general">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Minutos de exposición a la luz natural. Recomendado: 30+ min/día para regular el ritmo circadiano."><div class="es-mc-top"><span class="es-mc-icon">☀️</span><span class="es-mc-label">Luz diurna</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-luz">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido de auriculares. Por encima de 80 dB de forma sostenida puede dañar el oído."><div class="es-mc-top"><span class="es-mc-icon">🎧</span><span class="es-mc-label">Ruido auriculares</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-auri">—</span><span class="es-mc-unit">dB</span></div></div>
+        <div class="es-metric-card" title="Número de lavados de manos detectados por Apple Watch."><div class="es-mc-top"><span class="es-mc-icon">🧼</span><span class="es-mc-label">Lavado de manos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-lavado-manos">—</span><span class="es-mc-unit">veces</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido ambiental."><div class="es-mc-top"><span class="es-mc-icon">🔊</span><span class="es-mc-label">Ruido ambiental</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-env">—</span><span class="es-mc-unit">dB</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── NUTRICIÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-nutricion')">
+      <div class="extra-section-left"><span class="extra-section-icon">🥗</span><span class="extra-section-title">Nutrición</span></div>
+      <svg class="extra-chevron" id="chev-sec-nutricion" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-nutricion">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Agua consumida. Registrada manualmente o con apps de hidratación. Recomendación: 2.000–2.500 mL/día."><div class="es-mc-top"><span class="es-mc-icon">💧</span><span class="es-mc-label">Agua</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-agua">—</span><span class="es-mc-unit">mL</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── ÁNIMO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-animo')">
+      <div class="extra-section-left"><span class="extra-section-icon">🧠</span><span class="extra-section-title">Ánimo y bienestar</span></div>
+      <svg class="extra-chevron" id="chev-sec-animo" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-animo">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Estado de ánimo registrado manualmente en la app Salud (iOS 17+). Escala 1–5."><div class="es-mc-top"><span class="es-mc-icon">😊</span><span class="es-mc-label">Estado de ánimo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-estado-animo">—</span><span class="es-mc-unit">/ 5</span></div></div>
+        <div class="es-metric-card" title="Indicador de riesgo de ansiedad generalizada (GAD). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😰</span><span class="es-mc-label">Riesgo ansiedad</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ansiedad">—</span></div></div>
+        <div class="es-metric-card" title="Indicador de riesgo de depresión (PHQ). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😔</span><span class="es-mc-label">Riesgo depresión</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depresion">—</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{# Tooltip global #}
+<div id="global-tooltip" class="global-tooltip"></div>
+
+{# ── Modal ECG (reutilizado desde /ecg) ── #}
+<div class="ecg-modal-backdrop" id="dash-ecg-modal" onclick="if(event.target===this)closeDashECG()">
+  <div class="ecg-modal" style="max-width:860px">
+    <div class="ecg-modal-header">
+      <div class="ecg-modal-meta">
+        <div class="ecg-modal-meta-item"><span class="ecg-modal-key">Clasificación</span>
+          <div class="ecg-modal-badge"><span class="ecg-modal-dot" id="de-dot" style="background:#ccc"></span><span class="ecg-modal-val" id="de-clas">—</span></div></div>
+        <div class="ecg-modal-meta-item"><span class="ecg-modal-key">Fecha y hora</span><span class="ecg-modal-val" id="de-fecha">—</span></div>
+        <div class="ecg-modal-meta-item"><span class="ecg-modal-key">Duración</span><span class="ecg-modal-val" id="de-dur">—</span></div>
+        <div class="ecg-modal-meta-item"><span class="ecg-modal-key">Síntomas</span><span class="ecg-modal-val" id="de-sint">—</span></div>
+      </div>
+      <div class="ecg-modal-actions">
+        <button class="ecg-action-btn" id="de-btn-prev" onclick="dashECGNav(-1)" style="display:none">← Anterior</button>
+        <button class="ecg-action-btn" id="de-btn-next" onclick="dashECGNav(1)"  style="display:none">Siguiente →</button>
+        <button class="ecg-action-btn" onclick="dashECGZoomIn()">＋</button>
+        <button class="ecg-action-btn" onclick="dashECGZoomOut()">－</button>
+        <button class="ecg-action-btn" onclick="dashECGReset()">↺</button>
+        <button class="ecg-action-btn" onclick="dashECGExportPNG()">🖼 PNG</button>
+        <button class="ecg-close-btn"  onclick="closeDashECG()">✕</button>
+      </div>
+    </div>
+    <div class="ecg-modal-canvas-wrap" id="de-wrap" style="min-height:220px">
+      <div class="ecg-modal-grid"></div>
+      <canvas id="de-canvas"></canvas>
+      <div class="ecg-cursor-tip" id="de-cursor"></div>
+    </div>
+    <div class="ecg-modal-footer">
+      <span class="ecg-hint">🖱 Arrastra · Rueda = zoom</span>
+      <span class="ecg-scale" id="de-scale"></span>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="no-data-banner">
+  <p>No hay datos importados todavía.</p>
+  <a href="/">← Subir export.zip</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// TODAY en hora local del navegador (no UTC — evita desfase horario)
+const _now = new Date();
+const TODAY = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
+const DATE_MIN = '{{ daterange.date_min if daterange else "" }}' || '2015-01-01';
+let currentDate = '{{ date }}';
+let calYear, calMonth, dropdownOpen = false;
+
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const WORKOUT_NAMES = {
+  'HKWorkoutActivityTypeWalking': {label:'Caminar', icon:'🚶'},
+  'HKWorkoutActivityTypeRunning': {label:'Correr',  icon:'🏃'},
+  'HKWorkoutActivityTypeCycling': {label:'Ciclismo',icon:'🚴'},
+  'HKWorkoutActivityTypeSwimming':{label:'Natación',icon:'🏊'},
+  'HKWorkoutActivityTypeHiking':  {label:'Senderismo',icon:'🥾'},
+  'HKWorkoutActivityTypeYoga':    {label:'Yoga',    icon:'🧘'},
+  'HKWorkoutActivityTypeFunctionalStrengthTraining':{label:'Fuerza',icon:'💪'},
+  'HKWorkoutActivityTypeTraditionalStrengthTraining':{label:'Fuerza',icon:'💪'},
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function offsetDate(d, days) {
+  const [y,m,day] = d.split('-').map(Number);
+  const dt = new Date(y, m-1, day+days);   // hora local
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function toLocal(d) { const [y,m,day]=d.split('-').map(Number); return new Date(y,m-1,day); }
+function fmtN(n, dec=0) { return (n||0).toLocaleString('es-ES',{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
+
+// ── Tooltip global ────────────────────────────────────────────────────────────
+const gTooltip = document.getElementById('global-tooltip');
+let _canvasHover = false;  // true cuando el mouse está sobre un canvas
+
+function showTooltip(x, y, html) {
+  gTooltip.innerHTML = html;
+  gTooltip.style.display = 'block';
+  gTooltip.style.left = (x + 12) + 'px';
+  gTooltip.style.top  = (y - 10) + 'px';
+}
+function hideTooltip() {
+  if (_canvasHover) return;  // canvas tiene prioridad
+  gTooltip.style.display = 'none';
+}
+function hideTooltipForce() {
+  _canvasHover = false;
+  gTooltip.style.display = 'none';
+}
+
+// ── Tarjetas expandibles — click muestra gráfica ──────────────────────────────
+document.addEventListener('click', e => {
+  const card = e.target.closest('.es-metric-card');
+  if (!card) return;
+  const canvasWrap = card.querySelector('[id$="-chart-wrap"]');
+  if (!canvasWrap) return;
+  const wasExpanded = card.classList.contains('expanded');
+  card.closest('.es-metric-grid')?.querySelectorAll('.es-metric-card.expanded').forEach(c => {
+    c.classList.remove('expanded');
+    const w = c.querySelector('[id$="-chart-wrap"]'); if (w) w.style.display = 'none';
+  });
+  if (!wasExpanded) {
+    card.classList.add('expanded');
+    canvasWrap.style.display = 'block';
+    const canvas = canvasWrap.querySelector('canvas');
+    if (canvas) setTimeout(() => { if (canvas._redraw) canvas._redraw(); }, 80);
+  }
+});
+
+// ── Tooltip en tarjetas es-metric-card ───────────────────────────────────────
+document.addEventListener('mouseover', e => {
+  const card = e.target.closest('.es-metric-card');
+  if (!card || !card._tip) return;
+  showTooltip(e.clientX, e.clientY, card._tip);
+  gTooltip.style.maxWidth = '260px';
+  gTooltip.style.whiteSpace = 'normal';
+  _canvasHover = true;
+});
+document.addEventListener('mousemove', e => {
+  const card = e.target.closest('.es-metric-card');
+  if (card && card._tip) {
+    gTooltip.style.left = (e.clientX + 12) + 'px';
+    gTooltip.style.top  = (e.clientY - 10) + 'px';
+  }
+});
+document.addEventListener('mouseout', e => {
+  const card = e.target.closest('.es-metric-card');
+  if (card && card._tip && !card.contains(e.relatedTarget)) {
+    _canvasHover = false; hideTooltip();
+  }
+});
+
+// Guardar tooltip en _tip y quitar el atributo title (evita doble tooltip)
+document.querySelectorAll('.es-metric-card[title]').forEach(card => {
+  card._tip = card.getAttribute('title');
+  card.removeAttribute('title');
+});
+
+// ── Sincronizar botones ───────────────────────────────────────────────────────
+function syncButtons(d) {
+  document.getElementById('btn-next').classList.toggle('btn-off', d >= TODAY);
+  document.getElementById('btn-today').classList.toggle('btn-off', d === TODAY);
+  document.getElementById('btn-prev').classList.toggle('btn-off', d <= DATE_MIN);
+}
+
+// ── Label de fecha ────────────────────────────────────────────────────────────
+function updateDateLabel(d) {
+  const dt = toLocal(d);
+  const prefix = d === TODAY ? 'Hoy, ' : '';
+  const full = dt.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('dash-date-label').textContent = prefix + full[0].toUpperCase() + full.slice(1);
+  document.getElementById('dd-label').textContent = dt.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+}
+
+// ── goTo — función central ────────────────────────────────────────────────────
+function goTo(d) {
+  if (d > TODAY || d < DATE_MIN) return;
+  currentDate = d;
+  syncButtons(d);
+  updateDateLabel(d);
+  closeDropdown();
+  loadDay(d);
+  history.replaceState(null,'','/dashboard?date='+d);
+}
+
+// ── Anillos ───────────────────────────────────────────────────────────────────
+// ── Anillos — Canvas 2D ───────────────────────────────────────────────────────
+const RINGS = [
+  { id: 'ring-move',  r: 50, color: '#ff3b5c', bg: '#3d0010' },
+  { id: 'ring-ex',    r: 36, color: '#34c759', bg: '#0a3018' },
+  { id: 'ring-stand', r: 22, color: '#30b0c7', bg: '#003040' },
+];
+const RING_W = 11;
+let _ringPct = { 'ring-move': 0, 'ring-ex': 0, 'ring-stand': 0 };
+let _ringAnim = null;
+
+function drawRings(pcts) {
+  const canvas = document.getElementById('rings-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 60, cy = 60;
+  ctx.clearRect(0, 0, 140, 140);
+
+  RINGS.forEach(ring => {
+    const pct = Math.max(0, pcts[ring.id] || 0);
+    const start = -Math.PI / 2;          // 12h
+
+    // Fondo del anillo
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
+    ctx.strokeStyle = ring.bg;
+    ctx.lineWidth = RING_W;
+    ctx.stroke();
+
+    if (pct <= 0) return;
+
+    // Arco principal (hasta 100%)
+    const mainEnd = start + Math.min(pct, 1) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring.r, start, mainEnd);
+    ctx.strokeStyle = ring.color;
+    ctx.lineWidth = RING_W;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Overflow: arco extra encima con sombra
+    if (pct > 1) {
+      const ovPct = (pct - 1) % 1 || 1;
+      const ovEnd = start + ovPct * Math.PI * 2;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring.r, start, ovEnd);
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = RING_W;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+}
+
+// Animación suave desde 0 hasta los valores objetivo
+function animateRings(targets) {
+  if (_ringAnim) cancelAnimationFrame(_ringAnim);
+  const start = { ..._ringPct };
+  const duration = 1200; // ms
+  const t0 = performance.now();
+
+  function ease(t) {
+    // ease-out cubic
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function step(now) {
+    const elapsed = now - t0;
+    const progress = Math.min(elapsed / duration, 1);
+    const e = ease(progress);
+
+    const current = {};
+    RINGS.forEach(r => {
+      current[r.id] = start[r.id] + (targets[r.id] - start[r.id]) * e;
+    });
+
+    drawRings(current);
+    _ringPct = current;
+
+    if (progress < 1) _ringAnim = requestAnimationFrame(step);
+    else _ringPct = { ...targets };
+  }
+
+  _ringAnim = requestAnimationFrame(step);
+}
+
+function setRing(id, pct) { /* no-op, usamos animateRings */ }
+
+function resetRingInstant(id) { /* no-op */ }
+
+// ── Mini barras // ── Mini barras con tooltip ───────────────────────────────────────────────────
+function renderMiniBars(series) {
+  const wrap = document.getElementById('mini-bars');
+  wrap.innerHTML = '';
+  if (!series || !series.length) return;
+  const max = Math.max(...series.map(s => s.v), 1);
+  for (let h = 0; h < 24; h++) {
+    const pt  = series.find(s => s.h === h);
+    const pct = pt ? Math.max(5, (pt.v / max) * 100) : 0;
+    const bar = document.createElement('div');
+    bar.className = 'mini-bar' + (pt ? ' active' : '');
+    bar.style.height = pct + '%';
+    if (pt) {
+      bar.addEventListener('mouseenter', e => {
+        _canvasHover = true;
+        showTooltip(e.clientX, e.clientY,
+          `<b>${h}:00–${h+1}:00</b><br>${fmtN(pt.v,1)} kcal`);
+      });
+      bar.addEventListener('mousemove', e => {
+        gTooltip.style.left = (e.clientX+12)+'px';
+        gTooltip.style.top  = (e.clientY-10)+'px';
+      });
+      bar.addEventListener('mouseleave', () => hideTooltipForce());
+    }
+    wrap.appendChild(bar);
+  }
+}
+
+// ── Gráfica de línea suave (spline) con tooltip ───────────────────────────────
+function drawLineChart(canvasId, series, color, fillColor, labelFn) {
+  const canvas = document.getElementById(canvasId); if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 280;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0,0,W,H);
+  if (!series || series.length < 2) return;
+
+  const vals  = series.map(s => s.v);
+  const minV  = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const pts   = series.map((s,i) => ({
+    x: (i/(series.length-1)) * (W-4) + 2,
+    y: H - 6 - ((s.v - minV)/range) * (H-16),
+    d: s
+  }));
+
+  // Curva suave con bezier (tension 0.35)
+  function smoothPath(points) {
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(i-1, 0)];
+      const p1 = points[i];
+      const p2 = points[i+1];
+      const p3 = points[Math.min(i+2, points.length-1)];
+      const t = 0.35;
+      const cp1x = p1.x + (p2.x - p0.x) * t;
+      const cp1y = p1.y + (p2.y - p0.y) * t;
+      const cp2x = p2.x - (p3.x - p1.x) * t;
+      const cp2y = p2.y - (p3.y - p1.y) * t;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+  }
+
+  // Fill degradado
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, fillColor);
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, H);
+  ctx.lineTo(pts[0].x, pts[0].y);
+  smoothPath(pts);
+  ctx.lineTo(pts[pts.length-1].x, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Línea suave
+  ctx.beginPath();
+  smoothPath(pts);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Función de redibujado base (reutilizable)
+  function redraw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath(); ctx.moveTo(pts[0].x, H); ctx.lineTo(pts[0].x, pts[0].y);
+    smoothPath(pts); ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.beginPath(); smoothPath(pts);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+  }
+
+  // Hover con tooltip — coordenadas siempre relativas al canvas
+  let hoveredIdx = -1;
+
+  function getCanvasMx(e) {
+    // Calcular x relativa al canvas en píxeles del canvas (no CSS)
+    const rect = canvas.getBoundingClientRect();
+    // escala por si el canvas CSS != canvas resolución interna
+    const scaleX = canvas.width / rect.width;
+    return (e.clientX - rect.left) * scaleX;
+  }
+
+  canvas.onmousemove = e => {
+    _canvasHover = true;
+    const mx = getCanvasMx(e);
+    let best = 0, bestDist = Infinity;
+    pts.forEach((p, i) => {
+      const d = Math.abs(p.x - mx);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    // Umbral generoso: siempre hay punto activo mientras el cursor esté en el canvas
+    const threshold = W;  // todo el ancho = siempre activo
+    if (labelFn) {
+      showTooltip(e.clientX, e.clientY, labelFn(pts[best].d, best));
+      if (hoveredIdx !== best) {
+        hoveredIdx = best;
+        redraw();
+        // Punto con halo
+        const hp = pts[best];
+        ctx.beginPath(); ctx.arc(hp.x, hp.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.beginPath(); ctx.arc(hp.x, hp.y, 7, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.25; ctx.stroke(); ctx.globalAlpha = 1;
+        // Línea vertical guía punteada
+        ctx.beginPath();
+        ctx.moveTo(hp.x, hp.y + 8);
+        ctx.lineTo(hp.x, H);
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = 0.15;
+        ctx.setLineDash([3, 3]); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    }
+  };
+  canvas.onmouseleave = () => {
+    _canvasHover = false;
+    if (hoveredIdx !== -1) { redraw(); hoveredIdx = -1; }
+    hideTooltipForce();
+  };
+}
+
+// ── Gráfica de sueño con tooltip ─────────────────────────────────────────────
+function drawSleepChart(segments) {
+  const canvas = document.getElementById('sleep-chart'); if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 280;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0,0,W,H);
+  if (!segments || !segments.length) return;
+
+  const COLORS = {deep:'#1a3fa8', rem:'#bf5af2', light:'#63c3f5'};
+  const LABELS = {deep:'Sueño profundo', rem:'REM', light:'Sueño ligero'};
+  const total  = segments.reduce((a,s)=>a+s.mins,0) || 1;
+  let x = 0;
+  const rects = [];
+
+  segments.forEach(s => {
+    const w = (s.mins/total) * (W-2);
+    ctx.fillStyle = COLORS[s.phase] || '#ccc';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, 8, Math.max(w-2,2), H-8, 3);
+    else ctx.rect(x, 8, Math.max(w-2,2), H-8);
+    ctx.fill();
+    rects.push({x, w, phase: s.phase, mins: s.mins});
+    x += w;
+  });
+
+  canvas.onmousemove = e => {
+    _canvasHover = true;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const hit = rects.find(r => mx >= r.x && mx <= r.x + r.w);
+    if (hit) {
+      const h = Math.floor(hit.mins/60), m = Math.round(hit.mins%60);
+      showTooltip(e.clientX, e.clientY,
+        `<b>${LABELS[hit.phase]}</b><br>${h>0?h+' h ':''} ${m} m`);
+    } else hideTooltip();
+  };
+  canvas.onmouseleave = () => { _canvasHover = false; hideTooltipForce(); };
+}
+
+// ── Render entrenamientos ─────────────────────────────────────────────────────
+function renderWorkouts(workouts) {
+  const list = document.getElementById('workouts-list');
+  if (!workouts || !workouts.length) {
+    list.innerHTML = '<div class="workout-empty">Sin entrenamientos registrados</div>';
+    return;
+  }
+  list.innerHTML = workouts.map(w => {
+    const icon  = w.icon  || '🏅';
+    const name  = w.name  || w.type?.replace('HKWorkoutActivityType','') || 'Entrenamiento';
+    const dur   = w.duration_fmt || (w.dur_min ? w.dur_min + ' min' : '');
+    const dist  = w.dist_km  ? w.dist_km  + ' km'   : '';
+    const kcal  = w.kcal     ? w.kcal     + ' kcal'  : '';
+    const meta  = [dist, kcal].filter(Boolean).join(' · ');
+    const href  = w._idx != null ? `/workouts/${w._idx}` : null;
+    const tag   = href ? `a href="${href}"` : 'div';
+    const etag  = href ? 'a' : 'div';
+    return `<${tag} class="workout-row ${href?'workout-row-link':''}" style="${href?'text-decoration:none':''}">
+      <div class="workout-icon" style="filter:grayscale(1);opacity:.55">${icon}</div>
+      <div class="workout-info">
+        <div class="workout-name">${name}</div>
+        <div class="workout-meta">${dur}${meta?' · '+meta:''}</div>
+      </div>
+      ${w.has_route ? '<span class="workout-route-dot" title="Tiene ruta GPS">🗺</span>' : ''}
+    </${etag}>`;
+  }).join('');
+}
+
+// ── Actualizar dashboard ──────────────────────────────────────────────────────
+function updateDashboard(data) {
+  try {
+  // Actividad
+  const cal   = data.calories || 0;
+  const exMin = data.ex_min   || 0;
+  const stand = data.stand_h  || 0;
+  animateRings({
+    'ring-move':  cal / 500,
+    'ring-ex':    exMin / 30,
+    'ring-stand': stand / 12,
+  });
+  const setEl = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
+  setEl('act-move',  `${fmtN(cal)} / 500 CAL`);
+  setEl('act-ex',    `${fmtN(exMin)} / 30 MIN`);
+  setEl('act-stand', `${fmtN(stand)} / 12 H`);
+
+  renderMiniBars(data.cal_series);
+
+  // Pasos
+  document.getElementById('steps-num').textContent = fmtN(data.steps||0);
+  document.getElementById('steps-bar').style.width = Math.min((data.steps||0)/100, 100)+'%';
+
+  // FC
+  const hr = data.hr || {};
+  document.getElementById('hr-current').textContent = hr.current || '—';
+  document.getElementById('hr-avg').textContent     = hr.avg     || '—';
+  document.getElementById('hr-range').textContent   = hr.min && hr.max ? `${hr.min}–${hr.max} PPM` : '—';
+  drawLineChart('hr-chart', hr.series, '#ff6b6b', 'rgba(255,107,107,0.1)',
+    d => `<b>${d.h}:00</b><br>${d.v} PPM`);
+
+  // HRV
+  const hrv = data.hrv || {};
+  document.getElementById('hrv-num').textContent = hrv.avg ? fmtN(hrv.avg,1) : '—';
+  drawLineChart('hrv-chart', hrv.series, '#5b8dee', 'rgba(91,141,238,0.1)',
+    (_,i) => `Medición ${(i||0)+1}<br>${hrv.series?.[i]?.v||'—'} ms`);
+
+  // Sueño
+  const sleep = data.sleep || {};
+  document.getElementById('sleep-total').textContent = sleep.total_str || '—';
+  drawSleepChart(sleep.segments);
+  // Gráfica estilo Apple
+  if (sleep.segments) {
+    const tot = document.getElementById('sleep-apple-total');
+    if (tot) tot.textContent = sleep.total_str || '—';
+    drawSleepPhases(sleep.segments);
+  }
+
+  // Entrenamientos
+  renderWorkouts(data.workouts);
+  // Métricas adicionales
+  updateExtra(data.extra);
+  updateAllMetrics(data.all_metrics);
+  updateRecovery(data.recovery_score);
+  updateVO2Trend(data.vo2_trend);
+  } catch(err) { console.error('updateDashboard error:', err); }
+}
+
+function setLoadingState() {
+  ['hr-current','hr-avg','hrv-num','steps-num',
+   'act-move','act-ex','act-stand','sleep-total']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.textContent='…'; });
+  ['steps-bar'].forEach(id => { const el=document.getElementById(id); if(el) el.style.width='0%'; });
+  _ringPct = { 'ring-move': 0, 'ring-ex': 0, 'ring-stand': 0 };
+  drawRings(_ringPct);
+}
+
+async function loadDay(d) {
+  setLoadingState();
+  try {
+    const res  = await fetch('/api/day?date='+d);
+    const data = await res.json();
+    updateDashboard(data);
+  } catch(e) { console.error(e); }
+}
+
+// ── Calendario ────────────────────────────────────────────────────────────────
+const dropdown   = document.getElementById('date-dropdown');
+const pickerWrap = document.getElementById('date-picker-wrap');
+const displayBtn = document.getElementById('date-display-btn');
+
+function openDropdown() {
+  const [y,m] = currentDate.split('-').map(Number);
+  calYear = y; calMonth = m-1;
+  buildCalendar();
+  dropdown.classList.add('open');
+  displayBtn.classList.add('open');
+  dropdownOpen = true;
+}
+function closeDropdown() {
+  dropdown.classList.remove('open');
+  displayBtn.classList.remove('open');
+  dropdownOpen = false;
+}
+
+displayBtn.addEventListener('click', e => { e.stopPropagation(); dropdownOpen ? closeDropdown() : openDropdown(); });
+document.addEventListener('click', e => { if (dropdownOpen && !pickerWrap.contains(e.target)) closeDropdown(); });
+
+const monthSel = document.getElementById('cal-month-sel');
+const yearSel  = document.getElementById('cal-year-sel');
+MESES.forEach((m,i) => { const o=document.createElement('option'); o.value=i; o.textContent=m; monthSel.appendChild(o); });
+for (let y=+TODAY.slice(0,4); y>=+DATE_MIN.slice(0,4); y--) {
+  const o=document.createElement('option'); o.value=y; o.textContent=y; yearSel.appendChild(o);
+}
+monthSel.addEventListener('change', () => { calMonth=+monthSel.value; buildCalendar(); });
+yearSel.addEventListener('change',  () => { calYear =+yearSel.value;  buildCalendar(); });
+document.getElementById('cal-prev-month').addEventListener('click', e => { e.stopPropagation(); calMonth--; if(calMonth<0){calMonth=11;calYear--;} buildCalendar(); });
+document.getElementById('cal-next-month').addEventListener('click', e => { e.stopPropagation(); calMonth++; if(calMonth>11){calMonth=0;calYear++;} buildCalendar(); });
+document.getElementById('cal-today-btn').addEventListener('click', () => goTo(TODAY));
+
+function buildCalendar() {
+  monthSel.value = calMonth; yearSel.value = calYear;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  const firstDay = (new Date(calYear,calMonth,1).getDay()+6)%7;
+  const days = new Date(calYear,calMonth+1,0).getDate();
+  for (let i=0;i<firstDay;i++) { const b=document.createElement('div'); b.className='cal-day empty'; grid.appendChild(b); }
+  for (let d=1;d<=days;d++) {
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const btn=document.createElement('button');
+    btn.className='cal-day'; btn.textContent=d;
+    if (ds===currentDate) btn.classList.add('selected');
+    if (ds===TODAY)       btn.classList.add('is-today');
+    if (ds>TODAY||ds<DATE_MIN) { btn.classList.add('disabled'); btn.disabled=true; }
+    else btn.addEventListener('click', () => goTo(ds));
+    grid.appendChild(btn);
+  }
+}
+
+// ── Botones de navegación — sin pointer-events CSS, solo lógica JS ────────────
+document.getElementById('btn-prev').addEventListener('click', e => {
+  e.stopPropagation();
+  const p = offsetDate(currentDate, -1);
+  if (p >= DATE_MIN) goTo(p);
+});
+document.getElementById('btn-next').addEventListener('click', e => {
+  e.stopPropagation();
+  const n = offsetDate(currentDate, 1);
+  if (n <= TODAY) goTo(n);
+});
+document.getElementById('btn-today').addEventListener('click', e => {
+  e.stopPropagation();
+  if (currentDate !== TODAY) goTo(TODAY);
+});
+
+document.addEventListener('keydown', e => {
+  if (dropdownOpen && e.key==='Escape') { closeDropdown(); return; }
+  if (['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (e.key==='ArrowLeft')  { const p=offsetDate(currentDate,-1); if(p>=DATE_MIN) goTo(p); }
+  if (e.key==='ArrowRight') { const n=offsetDate(currentDate, 1); if(n<=TODAY)    goTo(n); }
+});
+
+// ── Gráfica de fases de sueño ────────────────────────────────────────────────
+const SLEEP_COLORS = {
+  deep:  { fill: '#1a237e', label: 'Profundo' },
+  rem:   { fill: '#7b1fa2', label: 'REM'      },
+  light: { fill: '#1565c0', label: 'Ligero'   },
+  awake: { fill: '#b71c1c', label: 'Vigilia'  },
+};
+const SLEEP_PHASES_ORDER = ['awake','rem','light','deep'];
+const PHASE_Y = { awake: 0, rem: 1, light: 2, deep: 3 };  // fila en el eje Y
+
+function drawSleepPhaseChart(segments) {
+  const canvas  = document.getElementById('sleep-phase-canvas');
+  const empty   = document.getElementById('sleep-phase-empty');
+  const tooltip = document.getElementById('sleep-phase-tooltip');
+  if (!canvas) return;
+
+  if (!segments || !segments.length) {
+    canvas.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+
+  // Escalar canvas al ancho real
+  const W = canvas.parentElement.clientWidth - 28; // padding 14*2
+  const H = 180;
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  // Calcular rango de tiempo total
+  const parseT = s => {
+    if (!s) return null;
+    // formato: "2025-03-12 00:07:14 +0200"
+    const norm = s.replace(' ', 'T').replace(/(\+|\-)(\d{2}):?(\d{2})$/, '$1$2:$3');
+    return new Date(norm).getTime();
+  };
+
+  const times = segments.flatMap(s => [parseT(s.start), parseT(s.end)]).filter(Boolean);
+  if (!times.length) return;
+  const tMin = Math.min(...times);
+  const tMax = Math.max(...times);
+  const tRange = tMax - tMin || 1;
+
+  // Área de dibujo: margen izquierdo para labels, inferior para eje X
+  const ML = 58, MR = 8, MT = 8, MB = 28;
+  const CW = W - ML - MR, CH = H - MT - MB;
+  const nRows = 4;  // awake, rem, light, deep
+  const rowH  = CH / nRows;
+  const barPad = 2; // px de separación entre la barra y el borde de la fila
+
+  // Fondo oscuro para la zona de gráfica
+  ctx.fillStyle = 'rgba(0,0,0,0.04)';
+  ctx.fillRect(ML, MT, CW, CH);
+
+  // Líneas horizontales de separación de fases
+  ctx.strokeStyle = 'rgba(128,128,128,0.15)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= nRows; i++) {
+    const y = MT + i * rowH;
+    ctx.beginPath(); ctx.moveTo(ML, y); ctx.lineTo(ML + CW, y); ctx.stroke();
+  }
+
+  // Labels de fase (eje Y)
+  const phaseLabels = [
+    { key: 'awake', label: 'Vigilia' },
+    { key: 'rem',   label: 'REM'     },
+    { key: 'light', label: 'Ligero'  },
+    { key: 'deep',  label: 'Profundo'},
+  ];
+  ctx.font = '10px ' + (getComputedStyle(document.body).getPropertyValue('--font-mono') || 'monospace');
+  ctx.textAlign = 'right';
+  phaseLabels.forEach((p, i) => {
+    const cy = MT + i * rowH + rowH / 2;
+    ctx.fillStyle = SLEEP_COLORS[p.key].fill;
+    ctx.fillText(p.label, ML - 6, cy + 4);
+  });
+
+  // Dibujar segmentos
+  canvas._segments = segments.map(seg => {
+    const t0 = parseT(seg.start), t1 = parseT(seg.end);
+    if (!t0 || !t1) return null;
+    const row = PHASE_Y[seg.phase];
+    if (row === undefined) return null;
+    const x  = ML + ((t0 - tMin) / tRange) * CW;
+    const x2 = ML + ((t1 - tMin) / tRange) * CW;
+    const bw  = Math.max(x2 - x, 2);
+    const y   = MT + row * rowH + barPad;
+    const bh  = rowH - barPad * 2;
+
+    ctx.fillStyle = SLEEP_COLORS[seg.phase].fill;
+    ctx.beginPath();
+    ctx.roundRect(x, y, bw, bh, Math.min(3, bw/2));
+    ctx.fill();
+
+    return { x, x2, y, bw, bh, seg, t0, t1 };
+  }).filter(Boolean);
+
+  // Eje X — marcas de hora
+  ctx.fillStyle = 'rgba(128,128,128,0.6)';
+  ctx.textAlign = 'center';
+  ctx.font = '10px monospace';
+  const tickH = new Date(tMin);
+  tickH.setMinutes(0, 0, 0);
+  tickH.setHours(tickH.getHours() + 1);
+  for (let t = tickH.getTime(); t <= tMax; t += 3600000) {
+    const x = ML + ((t - tMin) / tRange) * CW;
+    const d = new Date(t);
+    // Solo cada 2 horas si hay mucho rango
+    const diffH = tRange / 3600000;
+    if (diffH > 8 && d.getHours() % 2 !== 0) continue;
+    ctx.strokeStyle = 'rgba(128,128,128,0.2)';
+    ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + CH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(128,128,128,0.7)';
+    ctx.fillText(d.getHours().toString().padStart(2,'0') + ':00', x, H - 8);
+  }
+
+  // Hover tooltip
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx   = (e.clientX - rect.left) * (W / rect.width);
+    let found   = null;
+    for (const s of (canvas._segments || [])) {
+      if (mx >= s.x && mx <= s.x + s.bw) { found = s; break; }
+    }
+    if (found) {
+      const fmt = ms => {
+        const d = new Date(ms);
+        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+      };
+      const phase = SLEEP_COLORS[found.seg.phase]?.label || found.seg.phase;
+      tooltip.innerHTML = `<b>${phase}</b> · ${fmt(found.t0)}–${fmt(found.t1)} · ${found.seg.mins} min`;
+      tooltip.style.display = 'block';
+      tooltip.style.left    = ((found.x + found.bw/2) / W * 100) + '%';
+      tooltip.style.top     = (found.y - 32) + 'px';
+    } else {
+      tooltip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; };
+}
+
+// ── Panel de métricas adicionales ────────────────────────────────────────────
+
+// Guardar gráficas pendientes para redibujar al abrir sección
+const _pendingCharts = {};
+
+function toggleSection(id) {
+  const body = document.getElementById(id);
+  const chev = document.getElementById('chev-' + id);
+  const willOpen = !body.classList.contains('open');
+
+  // Cerrar todas las demás secciones (acordeón)
+  document.querySelectorAll('.extra-section-body').forEach(el => {
+    if (el.id !== id) {
+      el.classList.remove('open');
+      const c = document.getElementById('chev-' + el.id);
+      if (c) c.style.transform = '';
+    }
+  });
+
+  body.classList.toggle('open', willOpen);
+  if (chev) chev.style.transform = willOpen ? 'rotate(180deg)' : '';
+
+  if (willOpen && _pendingCharts[id]) {
+    _pendingCharts[id].forEach(fn => setTimeout(fn, 80));
+    _pendingCharts[id] = [];
+  }
+  if (willOpen && id === 'sec-sueno') {
+    const c = document.getElementById('sleep-phases-canvas');
+    if (c && c._sleepSegments) setTimeout(() => drawSleepPhases(c._sleepSegments), 80);
+  }
+  if (willOpen) {
+    ['steps-hour-canvas','hr-day-canvas'].forEach(cid => {
+      const cc = document.getElementById(cid);
+      if (cc && cc._redrawSection) setTimeout(cc._redrawSection, 80);
+    });
+  }
+}
+
+// Rellena un span de valor + span de rango min–max + badge stale si aplica
+function setM(id, metric, dec=0, mult=1) {
+  const el  = document.getElementById('m-' + id);
+  const rEl = document.getElementById('m-' + id + '-range');
+  const sEl = document.getElementById('m-' + id + '-stale');
+  if (!el) return;
+  if (!metric || metric.value === null || metric.value === undefined) {
+    el.textContent = '—';
+    if (rEl) rEl.textContent = '';
+    if (sEl) sEl.style.display = 'none';
+    return;
+  }
+  const v = metric.value * mult;
+  el.textContent = dec === 0 ? Math.round(v).toLocaleString('es-ES') : fmtN(v, dec);
+  if (rEl && metric.min !== null && metric.max !== null &&
+      Math.abs(metric.max - metric.min) > 0.05) {
+    const mn = metric.min * mult, mx = metric.max * mult;
+    const fmt = n => dec === 0 ? Math.round(n).toLocaleString('es-ES') : fmtN(n, dec);
+    rEl.textContent = fmt(mn) + '–' + fmt(mx);
+  } else if (rEl) {
+    rEl.textContent = '';
+  }
+  // Badge de dato desactualizado
+  if (sEl) {
+    if (metric.stale_date) {
+      const [y,m,d] = metric.stale_date.split('-');
+      sEl.textContent = `dato del ${d}/${m}/${y}`;
+      sEl.style.display = 'inline';
+    } else {
+      sEl.style.display = 'none';
+    }
+  }
+}
+
+// Registra una gráfica: dibuja cuando la sección tenga ancho real.
+function registerChart(sectionId, canvasId, wrapId, series, color, fill, labelFn) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  if (!series || series.length < 3) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = 'block';
+
+  // Esperar a que el canvas tenga ancho real antes de dibujar
+  const draw = () => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (canvas.offsetWidth === 0) {
+      if (!_pendingCharts[sectionId]) _pendingCharts[sectionId] = [];
+      _pendingCharts[sectionId].push(draw);
+      return;
+    }
+    drawLineChart(canvasId, series, color, fill, labelFn);
+    // Guardar referencia para redibujar al expandir la tarjeta
+    if (canvas) canvas._redraw = () => drawLineChart(canvasId, series, color, fill, labelFn);
+  };
+
+  const body = document.getElementById(sectionId);
+  if (body && body.classList.contains('open')) {
+    requestAnimationFrame(() => setTimeout(draw, 30));
+  } else {
+    if (!_pendingCharts[sectionId]) _pendingCharts[sectionId] = [];
+    _pendingCharts[sectionId].push(draw);
+  }
+}
+
+function updateAllMetrics(am) {
+  if (!am) return;
+  // Limpiar gráficas pendientes anteriores
+  Object.keys(_pendingCharts).forEach(k => { _pendingCharts[k] = []; });
+
+  const a  = am.actividad   || {};
+  const nu = am.nutricion   || {};
+  const c = am.corazon      || {};
+  const r = am.respiracion  || {};
+  const m = am.marcha       || {};
+  const b = am.cuerpo       || {};
+  const s = am.sueno        || {};   // {total_str, deep_min, rem_min, light_min}
+  const au= am.audio        || {};
+  const o = am.otros        || {};
+  const t = am.temp_muneca  || {};
+
+  // ── Actividad
+  setM('pasos',           a.pasos,         0);
+  setM('cal-activas',     a.cal_activas,   0);
+  setM('cal-basales',     a.cal_basales,   0);
+  setM('distancia',       a.distancia,     2);
+  setM('distancia-cicl',  a.distancia_cicl,2);
+  setM('pisos',           a.pisos,         0);
+  setM('ejercicio-min',   a.ejercicio_min, 0);
+  setM('depie-min',       a.de_pie_min,    0);
+  setM('depie-horas',     a.de_pie_horas,  0);
+  setM('esfuerzo',        a.esfuerzo_fis,  2);
+  setM('luz',             a.luz_diurna,    0);
+
+  registerChart('sec-actividad','cal-series-chart','cal-series-wrap',
+    a.cal_activas?.series, '#ff9500','rgba(255,149,0,0.12)',
+    d => `<b>${d.h}:00</b><br>${d.v} kcal`);
+
+  // ── Corazón
+  setM('fc',         c.fc,              0);
+  setM('fc-reposo',  c.fc_reposo,       0);
+  setM('fc-caminar', c.fc_caminar,      0);
+  setM('hrv',        c.hrv,             1);
+  setM('fc-recov',   c.fc_recuperacion, 0);
+  setM('vo2',        r.vo2max,          1);
+  setM('spo2',       r.spo2,            1);
+
+  // Fila ECG — solo visible si hay registros ese día
+  const ecgRow = document.getElementById('ecg-day-row');
+  const ecgEl  = document.getElementById('m-ecg-count');
+  const ecgCount = am?.corazon?.ecg_count?.value || 0;  // ← viene de all_metrics si existe
+  // Consultar directamente desde /api/ecg/date
+  fetch('/api/ecg/date/' + currentDate).then(r=>r.json()).then(ecgs => {
+    if (ecgs && ecgs.length > 0) {
+      if (ecgRow) {
+        ecgRow.style.display = '';
+        ecgRow.onclick = openDashECG;
+      }
+      if (ecgEl) ecgEl.textContent = ecgs.length;
+    } else {
+      if (ecgRow) ecgRow.style.display = 'none';
+    }
+  }).catch(()=>{ if(ecgRow) ecgRow.style.display='none'; });
+  registerChart('sec-corazon','m-fc-chart','m-fc-chart-wrap',
+    c.fc?.series, '#ff6b6b','rgba(255,107,107,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} PPM`);
+  registerChart('sec-corazon','m-hrv-chart','m-hrv-chart-wrap',
+    c.hrv?.series, '#5b8dee','rgba(91,141,238,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} ms`);
+
+  // ── Respiración
+  setM('resp',       r.frec_resp,  1);
+  setM('spo2',       r.spo2,       1);
+  setM('alter-resp', r.alter_resp, 1);
+  setM('vo2',        r.vo2max,     1);
+  registerChart('sec-respiracion','m-resp-chart','m-resp-chart-wrap',
+    r.frec_resp?.series, '#34c759','rgba(52,199,89,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} rpm`);
+  registerChart('sec-respiracion','m-spo2-chart','m-spo2-chart-wrap',
+    r.spo2?.series, '#ff3b5c','rgba(255,59,92,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v}%`);
+
+  // ── Sueño (formato diferente — viene de get_sleep_day)
+  const txt = id => document.getElementById('m-' + id);
+  const setTxt = (id, v) => { const el=txt(id); if(el) el.textContent = v ?? '—'; };
+  setTxt('sueno-total', s.total_str);
+  setTxt('sueno-deep',  s.deep_min  != null ? Math.round(s.deep_min) + ' min' : null);
+  setTxt('sueno-rem',   s.rem_min   != null ? Math.round(s.rem_min)  + ' min' : null);
+  setTxt('sueno-light', s.light_min != null ? Math.round(s.light_min)+ ' min' : null);
+  setTxt('sleep-total', s.total_str);
+  setTxt('sleep-deep',  s.deep_min  != null ? Math.round(s.deep_min) + ' min' : null);
+  setTxt('sleep-rem',   s.rem_min   != null ? Math.round(s.rem_min)  + ' min' : null);
+  setM('temp-muneca', t, 2);
+
+  // ── Marcha
+  setM('velocidad',   m.velocidad,     2);
+  setM('zancada',     m.longitud_zanca,1);
+  setM('doble-apoyo', m.doble_apoyo,   1);
+  setM('asimetria',   m.asimetria,     1);
+  setM('estabilidad', m.estabilidad,   1);
+  setM('vel-subida',  m.vel_subida,    2);
+  setM('vel-bajada',  m.vel_bajada,    2);
+  setM('test6min',    m.test_6min,     0);
+
+  // ── Cuerpo
+  setM('peso',       b.peso,      1);
+  setM('altura',     b.altura,    1);
+  setM('imc',        b.imc,       1);
+  setM('grasa',      b.grasa,     1);
+  setM('masa-magra', b.masa_magra,1);
+  setM('cintura',    b.cintura,   1);
+
+  // ── Audio
+  setM('ruido-env',     au.ruido_env,     1);
+  setM('ruido-auri',    au.ruido_auri,    1);
+  setM('eventos-audio', au.eventos_audio, 0);
+  setM('luz',           a.luz_diurna,     0);
+  setM('lavado-manos',  nu.lavado_manos,  0);
+  setM('agua',          nu.agua,          0);
+  const anm = am.animo || {};
+  setM('estado-animo',  anm.estado_animo, 0);
+  setM('ansiedad',      anm.ansiedad,     0);
+  setM('depresion',     anm.depresion,    0);
+
+  // ── Otros
+  setM('agua',   o.agua,         0);
+  setM('lavado', o.lavado_manos, 0);
+
+  // ── Gráfica FC del día — serie completa (raw) ────────────────────────────
+  const fcRaw = c.fc?.raw;
+  if (fcRaw && fcRaw.length > 1) {
+    const hrBlock = document.getElementById('hr-day-block');
+    if (hrBlock) hrBlock.style.display = 'block';
+    const fcMin = Math.min(...fcRaw.map(d=>d.v));
+    const fcMax = Math.max(...fcRaw.map(d=>d.v));
+    const fcAvg = Math.round(fcRaw.reduce((s,d)=>s+d.v,0)/fcRaw.length);
+    drawSectionLineChart(
+      'hr-day-canvas','hr-day-tip','hr-day-xaxis','hr-day-sub',
+      fcRaw, '#ff3b5c','rgba(255,59,92,0.12)',
+      d => `<b>${d.t}</b><br>${d.v} PPM`,
+      `${fcMin}–${fcMax} PPM · media ${fcAvg} PPM`
+    );
+  }
+
+  // ── Gráfica pasos por hora — barras ──────────────────────────────────────
+  const stepsSeries = a.pasos?.series;
+  if (stepsSeries && stepsSeries.length > 0) {
+    const stBlock = document.getElementById('steps-hour-block');
+    if (stBlock) stBlock.style.display = 'block';
+    const stTotal = stepsSeries.reduce((s,d)=>s+d.v,0);
+    drawStepsBarChart(
+      'steps-hour-canvas','steps-hour-tip','steps-hour-xaxis','steps-hour-sub',
+      stepsSeries,
+      `${Math.round(stTotal).toLocaleString('es-ES')} pasos totales`
+    );
+  }
+}
+
+// updateExtra ya no hace nada — todo está en updateAllMetrics
+function updateExtra() {}
+
+// ── Tooltip al pasar el ratón sobre el label o el valor ──────────────────────
+document.addEventListener('mouseover', e => {
+  const row = e.target.closest('.es-metric-card');
+  if (!row) { hideTooltip(); return; }
+  // Solo si el hover es sobre el label o el valor, no la gráfica
+  const overLabel = e.target.closest('.mrow-label');
+  const overVal   = e.target.closest('.mrow-val');
+  if (!overLabel && !overVal) return;
+  const tip = row.dataset.tip;
+  if (!tip) return;
+  gTooltip.innerHTML = tip;
+  gTooltip.style.display = 'block';
+  gTooltip.style.maxWidth = '280px';
+  gTooltip.style.whiteSpace = 'normal';
+  gTooltip.style.left = (e.clientX + 14) + 'px';
+  gTooltip.style.top  = (e.clientY - 12) + 'px';
+});
+document.addEventListener('mousemove', e => {
+  if (!gTooltip.style.display || gTooltip.style.display === 'none') return;
+  // No interferir si un canvas o mini-bar tiene el control
+  if (_canvasHover) {
+    gTooltip.style.left = (e.clientX + 14) + 'px';
+    gTooltip.style.top  = (e.clientY - 12) + 'px';
+    return;
+  }
+  const row = e.target.closest('.es-metric-card');
+  if (!row || (!e.target.closest('.mrow-label') && !e.target.closest('.mrow-val'))) {
+    hideTooltip(); return;
+  }
+  gTooltip.style.left = (e.clientX + 14) + 'px';
+  gTooltip.style.top  = (e.clientY - 12) + 'px';
+});
+document.addEventListener('mouseout', e => {
+  if (!e.target.closest('.mrow-label') && !e.target.closest('.mrow-val')) return;
+  if (!e.relatedTarget || (!e.relatedTarget.closest('.mrow-label') && !e.relatedTarget.closest('.mrow-val')))
+    hideTooltip();
+});
+
+// ── Modal ECG en el Dashboard ────────────────────────────────────────────────
+let _deData = null;   // ECGs del día actual [{meta, samples}, ...]
+let _deIdx  = 0;      // índice activo dentro de _deData
+let _deSamples = [], _deSr = 512, _deViewStart = 0, _deZoom = 1;
+let _deDrag = false, _deDragX = 0, _deDragV = 0;
+let _deMeta = {};
+
+const deCanvas = document.getElementById('de-canvas');
+const deCtx    = deCanvas ? deCanvas.getContext('2d') : null;
+const deWrap   = document.getElementById('de-wrap');
+
+function deResize() {
+  if (!deCanvas || !deWrap) return;
+  deCanvas.width  = deWrap.offsetWidth;
+  deCanvas.height = deWrap.offsetHeight;
+  if (_deSamples.length) deDraw();
+}
+
+function deDraw() {
+  if (!deCtx || !_deSamples.length) return;
+  const W = deCanvas.width, H = deCanvas.height;
+  deCtx.clearRect(0,0,W,H);
+  const vis   = Math.floor(_deSamples.length / _deZoom);
+  const start = Math.max(0, Math.min(_deViewStart, _deSamples.length - vis));
+  const win   = _deSamples.slice(start, start + vis);
+  const mid   = win.reduce((a,b)=>a+b,0)/win.length;
+  const amp   = Math.max(...win.map(v=>Math.abs(v-mid)))||1;
+  const scY   = (H/2-16)/amp;
+  deCtx.beginPath(); deCtx.moveTo(0,H/2); deCtx.lineTo(W,H/2);
+  deCtx.strokeStyle='rgba(200,150,150,.3)'; deCtx.lineWidth=1;
+  deCtx.setLineDash([5,5]); deCtx.stroke(); deCtx.setLineDash([]);
+  deCtx.beginPath(); deCtx.strokeStyle='#c8000a'; deCtx.lineWidth=1.8;
+  deCtx.lineJoin='round'; deCtx.lineCap='round';
+  win.forEach((v,i)=>{
+    const x=(i/(win.length-1))*W, y=H/2-(v-mid)*scY;
+    i===0?deCtx.moveTo(x,y):deCtx.lineTo(x,y);
+  });
+  deCtx.stroke();
+  const s0=(start/_deSr).toFixed(1), s1=((start+vis)/_deSr).toFixed(1);
+  document.getElementById('de-scale').textContent=`${s0}s – ${s1}s · ×${_deZoom.toFixed(1)}`;
+}
+
+function deLoadIdx(idx) {
+  if (!_deData || !_deData[idx]) return;
+  _deIdx = idx;
+  const ecg = _deData[idx];
+  _deSamples = ecg.samples; _deSr = ecg.meta.sample_rate;
+  _deViewStart = 0; _deZoom = 1; _deMeta = ecg.meta;
+  const sin = (ecg.meta.clasificacion||'').toLowerCase().includes('sinusal');
+  document.getElementById('de-clas').textContent  = ecg.meta.clasificacion||'—';
+  document.getElementById('de-dot').style.background = sin?'#34c759':'#ff9500';
+  document.getElementById('de-fecha').textContent = ecg.meta.fecha_iso+' · '+ecg.meta.hora;
+  document.getElementById('de-dur').textContent   = ecg.meta.duration_s+'s';
+  document.getElementById('de-sint').textContent  = ecg.meta.sintomas||'Ninguno';
+  // Botones de navegación si hay más de un ECG ese día
+  const prev = document.getElementById('de-btn-prev');
+  const next = document.getElementById('de-btn-next');
+  if (prev && next) {
+    prev.style.display = _deData.length > 1 ? '' : 'none';
+    next.style.display = _deData.length > 1 ? '' : 'none';
+    prev.disabled = idx === 0;
+    next.disabled = idx === _deData.length - 1;
+  }
+  deResize(); deDraw();
+}
+
+async function openDashECG() {
+  // Cargar todos los ECGs del día actual
+  const res  = await fetch('/api/ecg/date/' + currentDate);
+  const data = await res.json();
+  if (!data || !data.length) return;
+  _deData = data; _deIdx = 0;
+  document.getElementById('dash-ecg-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => deLoadIdx(0), 50);
+}
+
+function closeDashECG() {
+  document.getElementById('dash-ecg-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function dashECGNav(dir) {
+  const next = _deIdx + dir;
+  if (next >= 0 && next < (_deData||[]).length) deLoadIdx(next);
+}
+
+function dashECGZoomIn()  { _deZoom=Math.min(_deZoom*2,64); deClamp(); deDraw(); }
+function dashECGZoomOut() { _deZoom=Math.max(_deZoom/2,1);  deClamp(); deDraw(); }
+function dashECGReset()   { _deZoom=1; _deViewStart=0; deDraw(); }
+function deClamp() {
+  const vis=Math.floor(_deSamples.length/_deZoom);
+  _deViewStart=Math.max(0,Math.min(_deViewStart,_deSamples.length-vis));
+}
+
+function dashECGExportPNG() {
+  if (!_deSamples.length) return;
+  const exp=document.createElement('canvas'); exp.width=1200; exp.height=400;
+  const ec=exp.getContext('2d');
+  ec.fillStyle='#fff'; ec.fillRect(0,0,1200,400);
+  ec.strokeStyle='rgba(220,160,160,.4)'; ec.lineWidth=1;
+  for(let x=0;x<=1200;x+=50){ec.beginPath();ec.moveTo(x,0);ec.lineTo(x,400);ec.stroke();}
+  for(let y=0;y<=400;y+=50){ec.beginPath();ec.moveTo(0,y);ec.lineTo(1200,y);ec.stroke();}
+  const mid=_deSamples.reduce((a,b)=>a+b,0)/_deSamples.length;
+  const amp=Math.max(..._deSamples.map(v=>Math.abs(v-mid)))||1;
+  const scY=(190)/amp;
+  ec.beginPath(); ec.strokeStyle='#c8000a'; ec.lineWidth=2;
+  ec.lineJoin='round'; ec.lineCap='round';
+  _deSamples.forEach((v,i)=>{
+    const x=(i/(_deSamples.length-1))*1200, y=200-(v-mid)*scY;
+    i===0?ec.moveTo(x,y):ec.lineTo(x,y);
+  });
+  ec.stroke();
+  ec.fillStyle='#333'; ec.font='bold 11px monospace';
+  ec.fillText(`${_deMeta.fecha_iso} ${_deMeta.hora} · ${_deMeta.clasificacion} · ${_deMeta.duration_s}s`, 12, 390);
+  const link=document.createElement('a');
+  link.download=`ecg_${_deMeta.fecha_iso}.png`;
+  link.href=exp.toDataURL(); link.click();
+}
+
+if (deCanvas) {
+  deCanvas.addEventListener('wheel', e=>{e.preventDefault(); e.deltaY<0?dashECGZoomIn():dashECGZoomOut();},{passive:false});
+  deCanvas.addEventListener('mousedown', e=>{_deDrag=true;_deDragX=e.clientX;_deDragV=_deViewStart;deCanvas.style.cursor='grabbing';});
+  window.addEventListener('mousemove', e=>{
+    if(!_deDrag||!_deSamples.length)return;
+    const vis=Math.floor(_deSamples.length/_deZoom);
+    _deViewStart=Math.max(0,Math.min(_deDragV+Math.round(-(e.clientX-_deDragX)/deCanvas.width*vis),_deSamples.length-vis));
+    deDraw();
+  });
+  window.addEventListener('mouseup',()=>{_deDrag=false;if(deCanvas)deCanvas.style.cursor='crosshair';});
+  deCanvas.addEventListener('mousemove',e=>{
+    if(_deDrag||!_deSamples.length)return;
+    const rect=deCanvas.getBoundingClientRect();
+    const relX=(e.clientX-rect.left)/rect.width;
+    const vis=Math.floor(_deSamples.length/_deZoom);
+    const idx=Math.round(_deViewStart+relX*vis);
+    if(idx>=0&&idx<_deSamples.length){
+      const tip=document.getElementById('de-cursor');
+      tip.textContent=`${(idx/_deSr).toFixed(3)}s  ${_deSamples[idx].toFixed(1)} µV`;
+      tip.style.display='block';
+    }
+  });
+  deCanvas.addEventListener('mouseleave',()=>{const t=document.getElementById('de-cursor');if(t)t.style.display='none';});
+}
+window.addEventListener('resize', deResize);
+document.addEventListener('keydown', e=>{if(e.key==='Escape')closeDashECG();});
+
+// ── Recuperación estimada ─────────────────────────────────────────────────────
+function updateRecovery(rs) {
+  if (!rs) return;
+
+  // Tarjeta del resumen superior
+  const card = document.getElementById('recovery-summary-card');
+  if (card) {
+    card.style.display = '';
+    const scoreEl = document.getElementById('rec-score-top');
+    const barEl   = document.getElementById('rec-bar-top');
+    const labelEl = document.getElementById('rec-label-top');
+    if (scoreEl) { scoreEl.textContent = rs.score; scoreEl.style.color = rs.color; }
+    if (barEl)   { barEl.style.width = rs.score + '%'; barEl.style.background = rs.color; }
+    if (labelEl) {
+      const details = [];
+      if (rs.hrv_today) details.push(`HRV ${rs.hrv_today} ms`);
+      if (rs.rhr_today) details.push(`FC rep. ${rs.rhr_today} PPM`);
+      labelEl.textContent = rs.label + (details.length ? ' · ' + details.join(' · ') : '');
+    }
+  }
+}
+
+function updateVO2Trend(trend) { /* reservado para historial */ }
+
+// ── Gráfica de fases de sueño estilo Apple ───────────────────────────────────
+function drawSleepPhases(segments) {
+  const wrap    = document.getElementById('sleep-apple-wrap');
+  const noData  = document.getElementById('sleep-no-data');
+  const canvas  = document.getElementById('sleep-phases-canvas');
+  if (!canvas) return;
+
+  if (!segments || !segments.length) {
+    if (wrap)   wrap.style.display   = 'none';
+    if (noData) noData.style.display = 'block';
+    return;
+  }
+  if (wrap)   wrap.style.display   = 'block';
+  if (noData) noData.style.display = 'none';
+
+  // Detectar si hay fases o solo datos sin especificar
+  const hasPhases = segments.some(s => s.phase === 'deep' || s.phase === 'rem');
+  const PHASES = hasPhases
+    ? { awake: 0, rem: 1, light: 2, deep: 3 }
+    : { awake: 0, light: 1 };  // sin fases: solo Despierto / Dormido
+  const COLORS = {
+    awake: '#ff6b6b',
+    rem:   '#63c3f5',
+    light: '#3a7bd5',
+    deep:  '#1a3fa8',
+  };
+  const ROWS = hasPhases ? 4 : 2;
+
+  // Calcular rango de tiempo
+  const parseT = s => new Date(s.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) \+(\d{2})(\d{2})$/, '$1T$2+$3:$4')).getTime();
+  const times  = segments.flatMap(s => [parseT(s.start), parseT(s.end)]);
+  const tMin   = Math.min(...times), tMax = Math.max(...times);
+  const tRange = tMax - tMin || 1;
+
+  // Canvas
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = hasPhases ? 140 : 80;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const W = canvas.width, H = canvas.height;
+  const rowH   = H / ROWS;
+  const padX   = 0;
+
+  // Fondo de filas alternadas
+  for (let r = 0; r < ROWS; r++) {
+    ctx.fillStyle = r % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.01)';
+    ctx.fillRect(0, r * rowH, W, rowH);
+  }
+
+  // Líneas de separación
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+  for (let r = 1; r < ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r*rowH); ctx.lineTo(W, r*rowH); ctx.stroke();
+  }
+
+  // Segmentos
+  segments.forEach(seg => {
+    const rowIdx = PHASES[seg.phase];
+    if (rowIdx === undefined) return;
+    const t0 = parseT(seg.start), t1 = parseT(seg.end);
+    const x0 = ((t0 - tMin) / tRange) * W;
+    const x1 = ((t1 - tMin) / tRange) * W;
+    const bw  = Math.max(x1 - x0, 2);
+    const y   = rowIdx * rowH + rowH * 0.15;
+    const bh  = rowH * 0.70;
+    const rx  = Math.min(4, bw / 2);
+
+    ctx.fillStyle = COLORS[seg.phase] || '#888';
+    ctx.beginPath();
+    ctx.roundRect(x0, y, bw, bh, rx);
+    ctx.fill();
+  });
+
+  // Actualizar etiquetas del eje Y según si hay fases
+  const labelsEl = document.getElementById('sleep-apple-labels');
+  if (labelsEl) {
+    labelsEl.innerHTML = hasPhases
+      ? '<div>Vigilia</div><div>REM</div><div>Ligero</div><div>Profundo</div>'
+      : '<div>Despierto</div><div>Dormido</div>';
+  }
+
+  // Eje X: horas — máximo 8 marcas
+  const xAxis = document.getElementById('sleep-x-axis');
+  if (xAxis) {
+    const durationH = tRange / 3600000;
+    const stepH = durationH <= 4 ? 1 : durationH <= 8 ? 1 : 2; // paso en horas
+    const labels = [];
+    let cur = new Date(tMin);
+    cur.setMinutes(0, 0, 0);
+    if (cur.getTime() < tMin) cur.setHours(cur.getHours() + 1);
+    while (cur.getTime() <= tMax) {
+      const pct = ((cur.getTime() - tMin) / tRange * 100).toFixed(1);
+      const hstr = cur.getHours().toString().padStart(2,'0') + ':00';
+      labels.push(`<span style="position:absolute;left:${pct}%;transform:translateX(-50%)">${hstr}</span>`);
+      cur = new Date(cur.getTime() + stepH * 3600000);
+    }
+    xAxis.style.position = 'relative';
+    xAxis.style.height   = '18px';
+    xAxis.innerHTML      = labels.join('');
+  }
+
+  // Totales por fase
+  const totals = {awake:0, rem:0, light:0, deep:0};
+  segments.forEach(s => { if (totals[s.phase] !== undefined) totals[s.phase] += s.mins; });
+  const fmt = m => m < 60 ? Math.round(m)+' m' : Math.floor(m/60)+' h '+(Math.round(m%60)+' m');
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('sp-awake', totals.awake > 0 ? fmt(totals.awake) : '—');
+  setEl('sp-rem',   totals.rem   > 0 ? fmt(totals.rem)   : '—');
+  setEl('sp-light', totals.light > 0 ? fmt(totals.light) : '—');
+  setEl('sp-deep',  totals.deep  > 0 ? fmt(totals.deep)  : '—');
+
+  // Tooltip al hover
+  const tip = document.getElementById('sleep-hover-tip');
+  canvas.onmousemove = e => {
+    const rect  = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx    = (e.clientX - rect.left) * scaleX;
+    const my    = (e.clientY - rect.top);
+    const rowI  = Math.floor(my / (rect.height / ROWS));
+    const phaseName = Object.keys(PHASES).find(k => PHASES[k] === rowI) || '';
+    const t     = tMin + (mx / canvas.width) * tRange;
+    const date  = new Date(t);
+    const hStr  = date.getHours().toString().padStart(2,'0') + ':' + date.getMinutes().toString().padStart(2,'0');
+    // Buscar segmento bajo el cursor
+    const seg   = segments.find(s => parseT(s.start) <= t && parseT(s.end) >= t && s.phase === phaseName);
+    if (seg) {
+      const PHASE_LABELS = {awake:'Vigilia', rem:'REM', light:'Ligero', deep:'Profundo'};
+      tip.innerHTML = `<b>${PHASE_LABELS[seg.phase]}</b> · ${fmt(seg.mins)}<br>${hStr}`;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX - rect.left) + 'px';
+      tip.style.top  = (e.clientY - rect.top - 44) + 'px';
+    } else {
+      tip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { if(tip) tip.style.display = 'none'; };
+
+  // Guardar para redibujar al redimensionar
+  canvas._sleepSegments = segments;
+}
+
+window.addEventListener('resize', () => {
+  const c = document.getElementById('sleep-phases-canvas');
+  if (c && c._sleepSegments) drawSleepPhases(c._sleepSegments);
+});
+
+// ── Gráfica de línea para sección (FC del día / pasos por hora) ──────────────
+function drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color, fillColor, labelFn, subText) {
+  const canvas = document.getElementById(canvasId);
+  const tip    = document.getElementById(tipId);
+  const xaxis  = document.getElementById(xaxisId);
+  const sub    = document.getElementById(subId);
+  if (!canvas || !dataPoints || !dataPoints.length) return;
+
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = 90;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const vals = dataPoints.map(d => d.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const padX = 0, padY = 8;
+
+  const pts = dataPoints.map((d, i) => ({
+    x: (i / (dataPoints.length-1)) * (W - padX*2) + padX,
+    y: H - padY - ((d.v - minV) / range) * (H - padY*2),
+    d,
+  }));
+
+  // Fill
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, fillColor); grad.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.moveTo(pts[0].x, H); ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i=1;i<pts.length;i++) {
+    const p0=pts[i-1], p1=pts[i], pm=pts[Math.max(i-2,0)], p2=pts[Math.min(i+1,pts.length-1)];
+    const t=0.25;
+    ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t, p0.y+(p1.y-pm.y)*t,
+                      p1.x-(p2.x-p0.x)*t, p1.y-(p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Línea
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i=1;i<pts.length;i++) {
+    const p0=pts[i-1], p1=pts[i], pm=pts[Math.max(i-2,0)], p2=pts[Math.min(i+1,pts.length-1)];
+    const t=0.25;
+    ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t, p0.y+(p1.y-pm.y)*t,
+                      p1.x-(p2.x-p0.x)*t, p1.y-(p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+
+  if (sub && subText) sub.textContent = subText;
+
+  // Eje X
+  if (xaxis) {
+    const step = Math.max(1, Math.floor(dataPoints.length / 8));
+    const labels = [];
+    dataPoints.forEach((d, i) => {
+      if (i % step === 0 || i === dataPoints.length-1) {
+        const pct = (pts[i].x / W * 100).toFixed(1);
+        labels.push(`<span style="left:${pct}%">${d.label || d.t || d.h+':00'}</span>`);
+      }
+    });
+    xaxis.innerHTML = labels.join('');
+  }
+
+  // Hover
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    let best=0, bestD=Infinity;
+    pts.forEach((p,i)=>{ const d=Math.abs(p.x-mx); if(d<bestD){bestD=d;best=i;}});
+    const hp = pts[best];
+    // Punto
+    ctx.clearRect(0,0,W,H);
+    // Redibujar base rápido
+    const grad2 = ctx.createLinearGradient(0,0,0,H);
+    grad2.addColorStop(0,fillColor); grad2.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(pts[0].x,H); ctx.lineTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();ctx.fillStyle=grad2;ctx.fill();
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+    // Dot
+    ctx.beginPath();ctx.arc(hp.x,hp.y,5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+    ctx.beginPath();ctx.arc(hp.x,hp.y,8,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.globalAlpha=.25;ctx.stroke();ctx.globalAlpha=1;
+    // Tooltip
+    if (tip) {
+      tip.innerHTML = labelFn(pts[best].d);
+      tip.style.display='block';
+      tip.style.left = (e.clientX-rect.left)+'px';
+      tip.style.top  = (hp.y/H*rect.height-8)+'px';
+    }
+  };
+  canvas.onmouseleave = () => {
+    if(tip) tip.style.display='none';
+    ctx.clearRect(0,0,W,H);
+    // Redibujar sin hover
+    const grad3=ctx.createLinearGradient(0,0,0,H);grad3.addColorStop(0,fillColor);grad3.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath();ctx.moveTo(pts[0].x,H);ctx.lineTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();ctx.fillStyle=grad3;ctx.fill();
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+  };
+
+  // Guardar para resize
+  canvas._redrawSection = () => drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color, fillColor, labelFn, subText);
+}
+
+// Redibujar al abrir sección
+const _origToggle = window._origToggleSection;
+
+// ── Gráfica de barras para pasos por hora ─────────────────────────────────────
+function drawStepsBarChart(canvasId, tipId, xaxisId, subId, data, subText) {
+  const canvas = document.getElementById(canvasId);
+  const tip    = document.getElementById(tipId);
+  const xaxis  = document.getElementById(xaxisId);
+  const sub    = document.getElementById(subId);
+  if (!canvas || !data || !data.length) return;
+
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = 90;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const maxV  = Math.max(...data.map(d => d.v)) || 1;
+  const n     = data.length;
+  const barW  = Math.max(2, (W / n) - 2);
+  const padY  = 6;
+
+  data.forEach((d, i) => {
+    const x   = (i / n) * W + 1;
+    const bh  = Math.max(2, ((d.v / maxV) * (H - padY - 4)));
+    const y   = H - padY - bh;
+    const alpha = d.v === 0 ? 0.1 : 0.75;
+    ctx.fillStyle = `rgba(255,149,0,${alpha})`;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, barW, bh, 3);
+    else ctx.rect(x, y, barW, bh);
+    ctx.fill();
+  });
+
+  if (sub && subText) sub.textContent = subText;
+
+  // Eje X: horas
+  if (xaxis) {
+    const step = Math.max(1, Math.floor(n / 8));
+    const labels = data.map((d, i) => {
+      if (i % step !== 0 && i !== n-1) return '';
+      const x = ((i + 0.5) / n * 100).toFixed(1);
+      return `<span style="left:${x}%">${d.h}:00</span>`;
+    }).join('');
+    xaxis.innerHTML = labels;
+  }
+
+  // Hover
+  canvas.onmousemove = e => {
+    const rect  = canvas.getBoundingClientRect();
+    const mx    = (e.clientX - rect.left) / rect.width * W;
+    const idx   = Math.min(n-1, Math.max(0, Math.floor(mx / (W/n))));
+    const d     = data[idx];
+    if (tip) {
+      tip.innerHTML = `<b>${d.h}:00</b><br>${Math.round(d.v).toLocaleString('es-ES')} pasos`;
+      const px = ((idx+0.5)/n * rect.width);
+      tip.style.display = 'block';
+      tip.style.left    = px + 'px';
+      tip.style.top     = '0px';
+    }
+    // Resaltar barra
+    ctx.clearRect(0,0,W,H);
+    data.forEach((dd, i) => {
+      const x  = (i/n)*W+1;
+      const bh = Math.max(2,((dd.v/maxV)*(H-padY-4)));
+      const y  = H-padY-bh;
+      ctx.fillStyle = i===idx ? 'rgba(255,149,0,1)' : `rgba(255,149,0,${dd.v===0?0.1:0.75})`;
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(x,y,barW,bh,3); else ctx.rect(x,y,barW,bh);
+      ctx.fill();
+    });
+  };
+  canvas.onmouseleave = () => {
+    if (tip) tip.style.display = 'none';
+    ctx.clearRect(0,0,W,H);
+    data.forEach((d,i)=>{
+      const x=(i/n)*W+1, bh=Math.max(2,((d.v/maxV)*(H-padY-4))), y=H-padY-bh;
+      ctx.fillStyle=`rgba(255,149,0,${d.v===0?0.1:0.75})`;
+      ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,barW,bh,3);else ctx.rect(x,y,barW,bh);ctx.fill();
+    });
+  };
+
+  canvas._redrawSection = () => drawStepsBarChart(canvasId, tipId, xaxisId, subId, data, subText);
+}
+
+// ── Exportar PDF del día ─────────────────────────────────────────────────────
+async function exportDayPDF() {
+  const btn = document.querySelector('.pdf-export-btn');
+  if (btn) { btn.textContent = 'Generando…'; btn.disabled = true; }
+
+  // Cargar jsPDF
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 190, ML = 10;
+  let y = 0;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getEl   = id => document.getElementById(id)?.textContent?.trim() || '—';
+  const newPage = () => { pdf.addPage(); y = 16; };
+  const checkY  = (need = 10) => { if (y + need > 278) newPage(); };
+
+  const header = (title, sub = '') => {
+    checkY(14);
+    pdf.setFillColor(30, 30, 30);
+    pdf.rect(ML, y, PW, 8, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(title.toUpperCase(), ML + 3, y + 5.5);
+    if (sub) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(180, 180, 180);
+      pdf.text(sub, ML + 3 + pdf.getTextWidth(title.toUpperCase()) + 4, y + 5.5);
+    }
+    y += 11;
+  };
+
+  const metaGrid = (items) => {
+    // Muestra items en grid de 3 columnas
+    const colW = PW / 3;
+    let col = 0;
+    items.forEach(([label, val, unit='']) => {
+      if (!val || val === '—') return;
+      const x = ML + col * colW;
+      checkY(14);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(label, x, y);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text(`${val}${unit ? ' '+unit : ''}`, x, y + 5.5);
+      col++;
+      if (col === 3) { col = 0; y += 14; }
+    });
+    if (col > 0) y += 14;
+    y += 2;
+  };
+
+  const addCanvas = (canvasId, label, maxH = 45) => {
+    const c = document.getElementById(canvasId);
+    if (!c || c.width === 0 || c.height === 0) return;
+    try {
+      const img = c.toDataURL('image/png');
+      const aspect = c.height / c.width;
+      const imgW = PW, imgH = Math.min(maxH, PW * aspect);
+      checkY(imgH + 8);
+      if (label) {
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
+        pdf.setTextColor(100,100,100);
+        pdf.text(label, ML, y); y += 4;
+      }
+      pdf.addImage(img, 'PNG', ML, y, imgW, imgH);
+      y += imgH + 5;
+    } catch(e) { console.warn('canvas export:', canvasId, e); }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PÁGINA 1 — Cabecera + Actividad + Corazón + Sueño
+  // ═══════════════════════════════════════════════════════════════════════════
+  pdf.setFillColor(17, 17, 17);
+  pdf.rect(0, 0, 210, 20, 'F');
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text('Resumen de Salud', ML, 9);
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+  pdf.setTextColor(180, 180, 180);
+  pdf.text(document.getElementById('dash-date-label')?.textContent || currentDate, ML, 15);
+
+  // Anillos — capturar el canvas
+  const ringsC = document.getElementById('rings-canvas');
+  if (ringsC) {
+    try {
+      const ri = ringsC.toDataURL('image/png');
+      pdf.addImage(ri, 'PNG', 210 - 36, 1, 34, 34);
+    } catch(e) {}
+  }
+  y = 26;
+
+  // Actividad
+  header('Actividad');
+  metaGrid([
+    ['Pasos',              getEl('steps-num')],
+    ['Distancia',          getEl('m-distancia'), 'km'],
+    ['Calorías activas',   getEl('m-cal-activas'), 'kcal'],
+    ['Movimiento',         getEl('act-move')],
+    ['Ejercicio',          getEl('act-ex')],
+    ['De pie',             getEl('act-stand')],
+    ['Cal. en reposo',     getEl('m-cal-basales'), 'kcal'],
+    ['Pisos subidos',      getEl('m-pisos')],
+    ['Esfuerzo',           getEl('m-esfuerzo'), '/10'],
+  ]);
+
+  // Gráfica de pasos por hora
+  addCanvas('steps-hour-canvas', 'Pasos por hora', 35);
+
+  // Corazón
+  header('Corazón');
+  metaGrid([
+    ['FC media',           getEl('m-fc'), 'PPM'],
+    ['FC reposo',          getEl('m-fc-reposo'), 'PPM'],
+    ['HRV',                getEl('m-hrv'), 'ms'],
+    ['Rec. cardíaca',      getEl('m-fc-recov'), 'PPM'],
+    ['FC al caminar',      getEl('m-fc-caminar'), 'PPM'],
+    ['SpO₂',               getEl('m-spo2'), '%'],
+  ]);
+
+  // Gráfica de FC del día
+  addCanvas('hr-day-canvas', 'FC a lo largo del día', 35);
+
+  // Sueño
+  header('Sueño');
+  metaGrid([
+    ['Total',              getEl('sleep-total')],
+    ['Profundo',           getEl('m-sleep-deep')],
+    ['REM',                getEl('m-sleep-rem')],
+    ['Temp. muñeca',       getEl('m-temp-muneca'), '°C'],
+  ]);
+  addCanvas('sleep-phases-canvas', 'Fases de sueño', 40);
+
+  // Recuperación
+  const recScore = getEl('rec-score-top');
+  if (recScore !== '—') {
+    header('Recuperación estimada');
+    metaGrid([
+      ['Puntuación',  recScore, '/ 100'],
+      ['Estado',      getEl('rec-label-top')],
+    ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PÁGINA 2 — Entrenamientos + ECG + Marcha
+  // ═══════════════════════════════════════════════════════════════════════════
+  newPage();
+
+  // Entrenamientos del día
+  const wkList = document.getElementById('workouts-list');
+  const hasWk  = wkList && !wkList.querySelector('.workout-empty');
+  header('Entrenamientos', hasWk ? '' : 'Sin entrenamientos este día');
+  if (hasWk) {
+    wkList.querySelectorAll('a.workout-row-link, div.workout-row-link').forEach(w => {
+      checkY(10);
+      const name = w.querySelector('.workout-name')?.textContent?.trim() || '';
+      const meta = w.querySelector('.workout-meta')?.textContent?.trim() || '';
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(20,20,20);
+      pdf.text(`${name}`, ML, y);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(100,100,100);
+      pdf.text(meta, ML + 50, y);
+      y += 7;
+    });
+  }
+  y += 4;
+
+  // ECG si hay datos ese día
+  const ecgRow = document.getElementById('ecg-day-row');
+  const ecgCount = document.getElementById('m-ecg-count')?.textContent?.trim();
+  if (ecgRow && ecgRow.style.display !== 'none' && ecgCount !== '—') {
+    header('ECG', `${ecgCount} registro(s)`);
+    // Capturar el canvas del modal ECG si está abierto
+    const ecgCanvas = document.getElementById('de-canvas');
+    if (ecgCanvas && ecgCanvas.width > 0) {
+      addCanvas('de-canvas', 'Electrocardiograma', 50);
+    } else {
+      pdf.setFont('helvetica', 'italic'); pdf.setFontSize(9); pdf.setTextColor(120,120,120);
+      pdf.text('Abre el ECG en el dashboard para incluir la gráfica en el PDF.', ML, y);
+      y += 8;
+    }
+    y += 4;
+  }
+
+  // Marcha y movilidad
+  const vel = getEl('m-velocidad');
+  header('Marcha y movilidad');
+  metaGrid([
+    ['Velocidad marcha',   vel !== '—' ? vel : '—', 'km/h'],
+    ['Longitud del paso',  getEl('m-zancada'), 'cm'],
+    ['Estabilidad',        getEl('m-estabilidad'), '%'],
+    ['Doble apoyo',        getEl('m-doble-apoyo'), '%'],
+    ['Asimetría',          getEl('m-asimetria'), '%'],
+    ['Marcha 6 min',       getEl('m-test6min'), 'm'],
+  ]);
+
+  // Respiración + Cuerpo + Nutrición
+  header('Más métricas');
+  metaGrid([
+    ['Frec. respiratoria', getEl('m-resp'), 'rpm'],
+    ['Peso',               getEl('m-peso'), 'kg'],
+    ['IMC',                getEl('m-imc'), 'kg/m²'],
+    ['Agua',               getEl('m-agua'), 'mL'],
+    ['Luz diurna',         getEl('m-luz'), 'min'],
+    ['Lavado manos',       getEl('m-lavado-manos'), 'veces'],
+  ]);
+
+  // ── Pie de página ─────────────────────────────────────────────────────────
+  const pages = pdf.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    pdf.setPage(i);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
+    pdf.setTextColor(160, 160, 160);
+    pdf.line(ML, 283, ML + PW, 283);
+    pdf.text(`Health Dashboard · ${currentDate} · Pág. ${i}/${pages}`, ML, 288);
+  }
+
+  pdf.save(`salud_${currentDate}.pdf`);
+  if (btn) { btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> PDF'; btn.disabled = false; }
+}
+
+// ── Inicio ────────────────────────────────────────────────────────────────────
+syncButtons(currentDate);
+updateDateLabel(currentDate);
+loadDay(currentDate);
+</script>
+{% endblock %}

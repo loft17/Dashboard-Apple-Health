@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<header class="hero">
+  <div class="logo-mark">
+    <div class="logo-icon">
+      <div class="logo-pulse"></div>
+      <svg viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
+    </div>
+    <span class="logo-text">Health Dashboard</span>
+  </div>
+  <h1>Tus datos.<br>Tu servidor.</h1>
+  <p class="subtitle">// apple_health · uso personal · debian</p>
+</header>
+
+{% if stats %}
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-value">{{ stats.total_records | default('—') }}</div>
+    <div class="stat-label">Registros</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">{{ stats.metrics_count | default('—') }}</div>
+    <div class="stat-label">Métricas</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">{{ stats.date_range_days | default('—') }}d</div>
+    <div class="stat-label">Historial</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">{{ stats.last_sync | default('—') }}</div>
+    <div class="stat-label">Último sync</div>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-dot"></div>
+  <span class="empty-text">// sin datos · sube tu primer export.zip</span>
+</div>
+{% endif %}
+
+<div class="actions">
+  <div class="card primary" onclick="toggleUpload()">
+    <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+    <div class="card-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <div class="card-title">Subir export.zip</div>
+    <div class="card-desc">Importa un nuevo export de Apple Health. Solo se añaden registros nuevos.</div>
+  </div>
+
+  <a class="card secondary" href="/dashboard">
+    <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+    <div class="card-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+    </div>
+    <div class="card-title">Ver mis datos</div>
+    <div class="card-desc">{% if stats %}Explora métricas, tendencias y análisis de tu salud.{% else %}Disponible después de importar tu primer export.{% endif %}</div>
+  </a>
+</div>
+
+{# Zona de upload #}
+<div class="upload-zone" id="upload-zone">
+  <input type="file" id="file-input" accept=".zip">
+  <span class="upload-icon">📦</span>
+  <div class="upload-title">Arrastra tu export.zip aquí</div>
+  <div class="upload-hint">o haz clic para seleccionar · máx 500 MB</div>
+</div>
+
+{# Panel de progreso #}
+<div class="progress-wrap" id="progress-wrap">
+  <div class="phases" id="phases-bar">
+    {% for i in range(1, 6) %}
+      <div class="phase-dot" id="ph-{{ i }}">{{ i }}</div>
+      {% if i < 5 %}<div class="phase-line" id="pl-{{ i }}"></div>{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="progress-main">
+    <div class="progress-header">
+      <span id="progress-label">Subiendo archivo…</span>
+      <span id="progress-pct">—</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div id="progress-msg"></div>
+  </div>
+
+  <div class="log-panel">
+    <div class="log-header">
+      <div class="log-dot" id="log-dot"></div>
+      <span class="log-title">log · importación en curso</span>
+    </div>
+    <div id="log-entries"></div>
+  </div>
+
+  <div class="summary-grid" id="summary-grid">
+    <div class="summary-item"><div class="summary-value" id="s-new">—</div><div class="summary-label">Registros nuevos</div></div>
+    <div class="summary-item"><div class="summary-value" id="s-total">—</div><div class="summary-label">Total en BD</div></div>
+    <div class="summary-item"><div class="summary-value" id="s-metrics">—</div><div class="summary-label">Métricas</div></div>
+    <div class="summary-item"><div class="summary-value" id="s-days">—</div><div class="summary-label">Días historial</div></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}
