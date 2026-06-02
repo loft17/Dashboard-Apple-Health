@@ -1,0 +1,217 @@
+
+  {# Macro para una fila de métrica #}
+  {# id_val: id del span de valor | label | unit | tip | icon | show_range: si muestra min-max #}
+
+  {# ── ACTIVIDAD ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-actividad')">
+      <div class="extra-section-left"><span class="extra-section-icon">🏃</span><span class="extra-section-title">Actividad</span></div>
+      <svg class="extra-chevron" id="chev-sec-actividad" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-actividad">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Anillo rojo: calorías activas quemadas hoy."><div class="es-mc-top"><span class="es-mc-icon">🔴</span><span class="es-mc-label">Movimiento</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cal-activas">—</span><span class="es-mc-unit">kcal</span></div></div>
+        <div class="es-metric-card" title="Anillo verde: minutos de ejercicio de intensidad moderada o superior."><div class="es-mc-top"><span class="es-mc-icon">🟢</span><span class="es-mc-label">Ejercicio</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ejercicio-min">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Anillo azul: horas en que te pusiste de pie al menos 1 minuto."><div class="es-mc-top"><span class="es-mc-icon">🔵</span><span class="es-mc-label">De pie</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depie-horas">—</span><span class="es-mc-unit">h</span></div></div>
+        <div class="es-metric-card" title="Total de pasos registrados hoy. La OMS recomienda 8.000–10.000 pasos/día."><div class="es-mc-top"><span class="es-mc-icon">👟</span><span class="es-mc-label">Pasos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-pasos">—</span><span class="es-mc-unit">pasos</span></div></div>
+        <div class="es-metric-card" title="Kilómetros recorridos caminando o corriendo."><div class="es-mc-top"><span class="es-mc-icon">📍</span><span class="es-mc-label">Distancia</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-distancia">—</span><span class="es-mc-unit">km</span></div></div>
+        <div class="es-metric-card" title="Minutos totales de pie a lo largo del día."><div class="es-mc-top"><span class="es-mc-icon">🧍</span><span class="es-mc-label">Minutos de pie</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depie-min">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Pisos subidos hoy. Apple Watch detecta cada subida de ~3 metros."><div class="es-mc-top"><span class="es-mc-icon">🪜</span><span class="es-mc-label">Pisos subidos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-pisos">—</span><span class="es-mc-unit">pisos</span></div></div>
+        <div class="es-metric-card" title="Energía quemada en reposo (metabolismo basal)."><div class="es-mc-top"><span class="es-mc-icon">💤</span><span class="es-mc-label">Energía en reposo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cal-basales">—</span><span class="es-mc-unit">kcal</span></div></div>
+        <div class="es-metric-card" title="Esfuerzo físico medio del día. Escala 0–10."><div class="es-mc-top"><span class="es-mc-icon">💪</span><span class="es-mc-label">Esfuerzo físico</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-esfuerzo">—</span><span class="es-mc-unit">/ 10</span></div></div>
+      </div>
+
+      {# Gráfica de pasos por hora #}
+      <div class="section-chart-block" id="steps-hour-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">Pasos por hora</span>
+          <span class="section-chart-sub" id="steps-hour-sub"></span>
+        </div>
+        <div class="section-chart-wrap">
+          <canvas id="steps-hour-canvas"></canvas>
+          <div class="section-chart-tip" id="steps-hour-tip" style="display:none"></div>
+        </div>
+        <div class="section-chart-xaxis" id="steps-hour-xaxis"></div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── CORAZÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-corazon')">
+      <div class="extra-section-left"><span class="extra-section-icon">❤️</span><span class="extra-section-title">Corazón</span></div>
+      <svg class="extra-chevron" id="chev-sec-corazon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-corazon">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Media de pulsaciones por minuto a lo largo del día."><div class="es-mc-top"><span class="es-mc-icon">💓</span><span class="es-mc-label">Frecuencia cardíaca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc">—</span><span class="es-mc-unit">PPM</span><span class="mrow-range" id="m-fc-range"></span></div></div>
+        <div class="es-metric-card" title="FC mínima en reposo. Un valor bajo (40–60 PPM) indica buena forma cardiovascular."><div class="es-mc-top"><span class="es-mc-icon">💗</span><span class="es-mc-label">FC en reposo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-reposo">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="HRV: variabilidad entre latidos. Más alto = mejor recuperación y sistema nervioso autónomo más activo."><div class="es-mc-top"><span class="es-mc-icon">📊</span><span class="es-mc-label">Variabilidad FC (HRV)</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-hrv">—</span><span class="es-mc-unit">ms</span></div></div>
+        <div class="es-metric-card" title="Caída de la FC al primer minuto tras un entrenamiento. Más de 12 PPM es saludable."><div class="es-mc-top"><span class="es-mc-icon">📉</span><span class="es-mc-label">Recuperación cardíaca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-recov">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="FC media mientras caminas. Un valor elevado puede indicar menor eficiencia cardiovascular."><div class="es-mc-top"><span class="es-mc-icon">🚶</span><span class="es-mc-label">FC al caminar</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-fc-caminar">—</span><span class="es-mc-unit">PPM</span></div></div>
+        <div class="es-metric-card" title="VO₂ máx: máxima capacidad de consumo de oxígeno. Indicador clave de forma física aeróbica."><div class="es-mc-top"><span class="es-mc-icon">🫁</span><span class="es-mc-label">Capacidad aeróbica</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vo2">—</span><span class="es-mc-unit">mL/min·kg</span></div></div>
+        <div class="ecg-day-row es-metric-card" id="ecg-day-row" style="display:none" title="Registros de ECG tomados este día. Pulsa para ver el electrocardiograma."><div class="es-mc-top"><span class="es-mc-icon">📈</span><span class="es-mc-label">ECG</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ecg-count">—</span><span class="es-mc-unit">registros</span></div></div>
+        <div class="es-metric-card" title="SpO₂: saturación de oxígeno en sangre. Normal: 95–100%."><div class="es-mc-top"><span class="es-mc-icon">🩸</span><span class="es-mc-label">Oxígeno en sangre</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-spo2">—</span><span class="es-mc-unit">%</span><span class="mrow-range" id="m-spo2-range"></span></div></div>
+      </div>
+
+      {# Gráfica de FC a lo largo del día #}
+      <div class="section-chart-block" id="hr-day-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">Frecuencia cardíaca</span>
+          <span class="section-chart-sub" id="hr-day-sub"></span>
+        </div>
+        <div class="section-chart-wrap">
+          <canvas id="hr-day-canvas"></canvas>
+          <div class="section-chart-tip" id="hr-day-tip" style="display:none"></div>
+        </div>
+        <div class="section-chart-xaxis" id="hr-day-xaxis"></div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── RESPIRACIÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-respiracion')">
+      <div class="extra-section-left"><span class="extra-section-title">Respiración</span></div>
+      <svg class="extra-chevron" id="chev-sec-respiracion" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-respiracion">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Respiraciones por minuto. Normal en adultos: 12–20 rpm."><div class="es-mc-top"><span class="es-mc-icon">🌬️</span><span class="es-mc-label">Frecuencia respiratoria</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-resp">—</span><span class="es-mc-unit">rpm</span><span class="mrow-range" id="m-resp-range"></span></div></div>
+        <div class="es-metric-card" title="Perturbaciones respiratorias durante el sueño. Un valor alto puede indicar apnea."><div class="es-mc-top"><span class="es-mc-icon">😴</span><span class="es-mc-label">Alteraciones resp.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-alter-resp">—</span><span class="es-mc-unit">/h</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SUEÑO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-sueno')">
+      <div class="extra-section-left"><span class="extra-section-icon">🌙</span><span class="extra-section-title">Sueño</span></div>
+      <svg class="extra-chevron" id="chev-sec-sueno" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-sueno">
+
+      {# Gráfica de fases de sueño estilo Apple — ancho completo #}
+      <div class="sleep-apple-wrap" id="sleep-apple-wrap" style="display:none">
+        <div class="sleep-apple-header">
+          <div>
+            <span class="sleep-apple-total" id="sleep-apple-total">—</span>
+            <span class="sleep-apple-sublabel">tiempo de sueño</span>
+          </div>
+          <div class="sleep-apple-pills">
+            <span class="sleep-pill sp-awake"><span class="sp-dot"></span>Vigilia <b id="sp-awake">—</b></span>
+            <span class="sleep-pill sp-rem">  <span class="sp-dot"></span>REM <b id="sp-rem">—</b></span>
+            <span class="sleep-pill sp-light"><span class="sp-dot"></span>Ligero <b id="sp-light">—</b></span>
+            <span class="sleep-pill sp-deep"> <span class="sp-dot"></span>Profundo <b id="sp-deep">—</b></span>
+          </div>
+        </div>
+        <div class="sleep-apple-graph">
+          <div class="sleep-apple-labels" id="sleep-apple-labels">
+            <div>Vigilia</div>
+            <div>REM</div>
+            <div>Ligero</div>
+            <div>Profundo</div>
+          </div>
+          <div class="sleep-apple-canvas-col">
+            <canvas id="sleep-phases-canvas"></canvas>
+            <div class="sleep-x-axis" id="sleep-x-axis"></div>
+            <div class="sleep-hover-tip" id="sleep-hover-tip" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sleep-no-data" id="sleep-no-data" style="display:none;padding:20px 16px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">Sin datos de sueño para este día</div>
+
+      {# Tarjetas de resumen #}
+      <div class="es-metric-grid" style="padding-top:0">
+        <div class="es-metric-card" title="Tiempo total dormido anoche."><div class="es-mc-top"><span class="es-mc-icon">⏱️</span><span class="es-mc-label">Duración total</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-total">—</span></div></div>
+        <div class="es-metric-card" title="Sueño profundo: la fase más reparadora. Adultos: ~20% del total."><div class="es-mc-top"><span class="es-mc-icon">🟦</span><span class="es-mc-label">Sueño profundo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-deep">—</span></div></div>
+        <div class="es-metric-card" title="Sueño REM: consolidación de la memoria. Adultos: ~25% del total."><div class="es-mc-top"><span class="es-mc-icon">🟣</span><span class="es-mc-label">Sueño REM</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-rem">—</span></div></div>
+        <div class="es-metric-card" title="Temperatura de muñeca durante el sueño."><div class="es-mc-top"><span class="es-mc-icon">🌡️</span><span class="es-mc-label">Temp. muñeca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-temp-muneca">—</span><span class="es-mc-unit">°C</span></div></div>
+      </div>
+    </div>
+  </div>
+
+
+  {# ── MARCHA Y MOVILIDAD ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-marcha')">
+      <div class="extra-section-left"><span class="extra-section-icon">🦶</span><span class="extra-section-title">Marcha y movilidad</span></div>
+      <svg class="extra-chevron" id="chev-sec-marcha" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-marcha">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Longitud media del paso al caminar. Un paso más largo indica mejor movilidad y fuerza."><div class="es-mc-top"><span class="es-mc-icon">👣</span><span class="es-mc-label">Longitud del paso</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-zancada">—</span><span class="es-mc-unit">cm</span></div></div>
+        <div class="es-metric-card" title="Velocidad media al caminar en km/h. Un ritmo saludable: 4.5–5.5 km/h."><div class="es-mc-top"><span class="es-mc-icon">🚶</span><span class="es-mc-label">Velocidad marcha</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-velocidad">—</span><span class="es-mc-unit">km/h</span></div></div>
+        <div class="es-metric-card" title="Velocidad al subir escaleras. Indicador de potencia muscular en piernas."><div class="es-mc-top"><span class="es-mc-icon">⬆️</span><span class="es-mc-label">Velocidad subir esc.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vel-subida">—</span><span class="es-mc-unit">m/s</span></div></div>
+        <div class="es-metric-card" title="Velocidad al bajar escaleras. Requiere control y equilibrio."><div class="es-mc-top"><span class="es-mc-icon">⬇️</span><span class="es-mc-label">Velocidad bajar esc.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-vel-bajada">—</span><span class="es-mc-unit">m/s</span></div></div>
+        <div class="es-metric-card" title="% de tiempo con ambos pies en el suelo al caminar. Más alto = marcha más cautelosa."><div class="es-mc-top"><span class="es-mc-icon">⚖️</span><span class="es-mc-label">Doble apoyo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-doble-apoyo">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Diferencia de tiempo entre pasos izquierdo y derecho. Más bajo = marcha más simétrica."><div class="es-mc-top"><span class="es-mc-icon">↔️</span><span class="es-mc-label">Asimetría marcha</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-asimetria">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Estabilidad al andar: rango 0–100%. Más alto = menor riesgo de caída."><div class="es-mc-top"><span class="es-mc-icon">🎯</span><span class="es-mc-label">Estabilidad</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-estabilidad">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Distancia recorrida en 6 minutos. Test clínico de capacidad funcional."><div class="es-mc-top"><span class="es-mc-icon">🏁</span><span class="es-mc-label">Marcha 6 minutos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-test6min">—</span><span class="es-mc-unit">m</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── CUERPO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-cuerpo')">
+      <div class="extra-section-left"><span class="extra-section-icon">⚖️</span><span class="extra-section-title">Cuerpo</span></div>
+      <svg class="extra-chevron" id="chev-sec-cuerpo" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-cuerpo">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Peso corporal."><div class="es-mc-top"><span class="es-mc-icon">⚖️</span><span class="es-mc-label">Peso</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-peso">—</span><span class="es-mc-unit">kg</span></div></div>
+        <div class="es-metric-card" title="Altura."><div class="es-mc-top"><span class="es-mc-icon">📏</span><span class="es-mc-label">Altura</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-altura">—</span><span class="es-mc-unit">cm</span></div></div>
+        <div class="es-metric-card" title="Índice de masa corporal. Normal: 18.5–24.9."><div class="es-mc-top"><span class="es-mc-icon">📊</span><span class="es-mc-label">IMC</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-imc">—</span><span class="es-mc-unit">kg/m²</span></div></div>
+        <div class="es-metric-card" title="Porcentaje de grasa corporal."><div class="es-mc-top"><span class="es-mc-icon">🫀</span><span class="es-mc-label">% grasa</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-grasa">—</span><span class="es-mc-unit">%</span></div></div>
+        <div class="es-metric-card" title="Masa muscular y ósea sin grasa."><div class="es-mc-top"><span class="es-mc-icon">💪</span><span class="es-mc-label">Masa magra</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-masa-magra">—</span><span class="es-mc-unit">kg</span></div></div>
+        <div class="es-metric-card" title="Perímetro de cintura."><div class="es-mc-top"><span class="es-mc-icon">📐</span><span class="es-mc-label">Cintura</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-cintura">—</span><span class="es-mc-unit">cm</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SALUD GENERAL ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-general')">
+      <div class="extra-section-left"><span class="extra-section-icon">🌿</span><span class="extra-section-title">Salud general</span></div>
+      <svg class="extra-chevron" id="chev-sec-general" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-general">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Minutos de exposición a la luz natural. Recomendado: 30+ min/día para regular el ritmo circadiano."><div class="es-mc-top"><span class="es-mc-icon">☀️</span><span class="es-mc-label">Luz diurna</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-luz">—</span><span class="es-mc-unit">min</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido de auriculares. Por encima de 80 dB de forma sostenida puede dañar el oído."><div class="es-mc-top"><span class="es-mc-icon">🎧</span><span class="es-mc-label">Ruido auriculares</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-auri">—</span><span class="es-mc-unit">dB</span></div></div>
+        <div class="es-metric-card" title="Número de lavados de manos detectados por Apple Watch."><div class="es-mc-top"><span class="es-mc-icon">🧼</span><span class="es-mc-label">Lavado de manos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-lavado-manos">—</span><span class="es-mc-unit">veces</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido ambiental."><div class="es-mc-top"><span class="es-mc-icon">🔊</span><span class="es-mc-label">Ruido ambiental</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-env">—</span><span class="es-mc-unit">dB</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── NUTRICIÓN ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-nutricion')">
+      <div class="extra-section-left"><span class="extra-section-icon">🥗</span><span class="extra-section-title">Nutrición</span></div>
+      <svg class="extra-chevron" id="chev-sec-nutricion" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-nutricion">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Agua consumida. Registrada manualmente o con apps de hidratación. Recomendación: 2.000–2.500 mL/día."><div class="es-mc-top"><span class="es-mc-icon">💧</span><span class="es-mc-label">Agua</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-agua">—</span><span class="es-mc-unit">mL</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── ÁNIMO ── #}
+  <div class="extra-section">
+    <button class="extra-section-btn" onclick="toggleSection('sec-animo')">
+      <div class="extra-section-left"><span class="extra-section-icon">🧠</span><span class="extra-section-title">Ánimo y bienestar</span></div>
+      <svg class="extra-chevron" id="chev-sec-animo" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="extra-section-body" id="sec-animo">
+      <div class="es-metric-grid">
+        <div class="es-metric-card" title="Estado de ánimo registrado manualmente en la app Salud (iOS 17+). Escala 1–5."><div class="es-mc-top"><span class="es-mc-icon">😊</span><span class="es-mc-label">Estado de ánimo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-estado-animo">—</span><span class="es-mc-unit">/ 5</span></div></div>
+        <div class="es-metric-card" title="Indicador de riesgo de ansiedad generalizada (GAD). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😰</span><span class="es-mc-label">Riesgo ansiedad</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ansiedad">—</span></div></div>
+        <div class="es-metric-card" title="Indicador de riesgo de depresión (PHQ). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😔</span><span class="es-mc-label">Riesgo depresión</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depresion">—</span></div></div>
+      </div>
+    </div>
+  </div>

@@ -2,8 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#111111">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Apple Health{% endblock %} · Dashboard</title>
+  <title>{% block title %}Health{% endblock %} · Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   {% block extra_css %}{% endblock %}
 </head>
@@ -11,7 +14,8 @@
 <div class="page">
 
   <nav class="navbar">
-    <a class="navbar-logo" href="/">
+    {# Logo — lleva al dashboard #}
+    <a class="navbar-logo" href="/dashboard">
       <div class="navbar-icon">
         <svg viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
       </div>
@@ -20,15 +24,35 @@
 
     <div class="navbar-sep"></div>
 
-    {% block nav_links %}
-    <a class="navbar-link {% if request.endpoint == 'main.index' %}active{% endif %}" href="/">Inicio</a>
-    <a class="navbar-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}" href="/dashboard">Dashboard</a>
-    <a class="navbar-link {% if request.endpoint == 'ecg.ecg_list' %}active{% endif %}" href="/ecg">ECG</a>
-    <a class="navbar-link {% if request.endpoint == 'workout.workouts_page' %}active{% endif %}" href="/workouts">Entrenamientos</a>
-    <a class="navbar-link {% if request.endpoint == 'hist.history_page' %}active{% endif %}" href="/historico">Histórico</a>
-    {% endblock %}
+    {# Links principales #}
+    <a class="navbar-link {% if request.endpoint in ('dashboard.dashboard',) %}active{% endif %}" href="/dashboard">Dashboard</a>
+    <a class="navbar-link {% if request.endpoint in ('ecg.ecg_list',) %}active{% endif %}" href="/ecg">ECG</a>
+    <a class="navbar-link {% if request.endpoint in ('workout.workouts_page','workout.workout_detail','workout.heatmap_page') %}active{% endif %}" href="/workouts">Entrenamientos</a>
+    <a class="navbar-link {% if request.endpoint in ('hist.history_page',) %}active{% endif %}" href="/historico">Histórico</a>
+    <a class="navbar-link {% if request.endpoint in ('wrapped.wrapped_page',) %}active{% endif %}" href="/año">{{ now.year if now else '' }}</a>
+    <a class="navbar-link {% if request.endpoint == 'gami.logros_page' %}active{% endif %}" href="/logros">🏆</a>
 
-    <span class="navbar-date" id="nav-date"></span>
+    {# Menú hamburguesa — derecha #}
+    <div class="nav-menu-wrap" style="margin-left:auto">
+      <button class="nav-menu-btn" id="nav-menu-btn" onclick="toggleNavMenu()" aria-label="Menú">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <rect x="2" y="3" width="3" height="10" rx="1.5"/>
+          <rect x="6.5" y="3" width="3" height="10" rx="1.5"/>
+          <rect x="11" y="3" width="3" height="10" rx="1.5"/>
+        </svg>
+      </button>
+      <div class="nav-menu-dropdown" id="nav-menu-dropdown">
+        <a class="nav-menu-item {% if request.endpoint == 'settings.settings_page' %}active{% endif %}" href="/ajustes">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Ajustes
+        </a>
+        <div class="nav-menu-sep"></div>
+        <a class="nav-menu-item" href="/logout">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Salir
+        </a>
+      </div>
+    </div>
   </nav>
 
   <main class="main-content {% block main_class %}{% endblock %}">
@@ -43,6 +67,29 @@
 
 <div id="toast"></div>
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script>
+function toggleNavMenu() {
+  const dd  = document.getElementById('nav-menu-dropdown');
+  const btn = document.getElementById('nav-menu-btn');
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-wrap')) {
+    document.getElementById('nav-menu-dropdown')?.classList.remove('open');
+    document.getElementById('nav-menu-btn')?.classList.remove('open');
+  }
+});
+</script>
 {% block extra_js %}{% endblock %}
+<script>
+// Registrar Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', {scope: '/'})
+      .catch(e => console.log('SW registro fallido:', e));
+  });
+}
+</script>
 </body>
 </html>

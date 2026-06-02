@@ -1,0 +1,12 @@
+{
+  "name": "Health Dashboard",
+  "short_name": "Health",
+  "description": "Dashboard personal de Apple Health",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#111111",
+  "icons": [
+    { "src": "/static/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso — Health Dashboard</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    .login-wrap {
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; background: var(--bg);
+    }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px 36px; width: 100%;
+      max-width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,.06);
+    }
+    .login-logo {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+    }
+    .login-logo svg { width: 32px; height: 32px; }
+    .login-logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; }
+    .login-subtitle {
+      font-size: 12px; color: var(--muted); font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+    .login-field { margin-bottom: 14px; }
+    .login-label {
+      display: block; font-size: 11px; font-family: var(--font-mono);
+      text-transform: uppercase; letter-spacing: .07em;
+      color: var(--muted); margin-bottom: 6px;
+    }
+    .login-input {
+      width: 100%; height: 40px; padding: 0 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); font-size: 14px; font-family: var(--font-display);
+      color: var(--text); transition: border-color .15s; outline: none;
+    }
+    .login-input:focus { border-color: var(--text); }
+    .login-btn {
+      width: 100%; height: 40px; margin-top: 8px;
+      background: var(--text); color: var(--bg);
+      border: none; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    .login-btn:hover { opacity: .85; }
+    .login-error {
+      background: #fef2f2; border: 1px solid #fecaca;
+      color: #c0392b; padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; font-family: var(--font-mono); margin-bottom: 14px;
+    }
+    .login-hint {
+      font-size: 11px; color: var(--dim); font-family: var(--font-mono);
+      text-align: center; margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+      <div>
+        <div class="login-logo-text">Health Dashboard</div>
+        <div class="login-subtitle">Datos personales de salud</div>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="login-error">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="login-field">
+        <label class="login-label">Usuario</label>
+        <input class="login-input" type="text" name="username"
+               autocomplete="username" autofocus placeholder="admin">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Contraseña</label>
+        <input class="login-input" type="password" name="password"
+               autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button class="login-btn" type="submit">Entrar</button>
+    </form>
+
+    <div class="login-hint">
+      Cambia usuario y contraseña con las variables de entorno<br>
+      <code>HEALTH_USER</code> y <code>HEALTH_PASSWORD</code>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -5,6 +5,9 @@ from services.db import get_conn, DB_FILE
 
 workout_bp = Blueprint('workout', __name__)
 
+# Caché de lista de workouts para heatmap
+_HM_CACHE = {}
+
 
 @workout_bp.route('/workouts')
 def workouts_page():
@@ -134,6 +137,66 @@ def api_workout_heartrate():
             ('HKQuantityTypeIdentifierHeartRate', start, end)
         ).fetchall()
     return jsonify([{'bpm': int(r['value']), 'time': r['start_date']} for r in rows])
+
+
+@workout_bp.route('/workouts/mapa-rutas')
+def heatmap_page():
+    from flask import render_template
+    return render_template('heatmap.html')
+
+
+@workout_bp.route('/api/workouts/heatmap')
+def api_heatmap():
+    from flask import request, jsonify
+    from datetime import datetime, timedelta
+    from services.workout import get_workout_route
+
+    period   = request.args.get('period', 'all')
+    wk_type  = request.args.get('type', '')
+
+    workouts = list_workouts()
+
+    # Filtrar por período
+    now = datetime.now()
+    if period == 'month':
+        cutoff = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == '3month':
+        cutoff = (now - timedelta(days=90)).strftime('%Y-%m-%d')
+    elif period == 'year':
+        cutoff = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    else:
+        cutoff = '2000-01-01'
+
+    filtered = [w for w in workouts if w.get('date','') >= cutoff]
+    if wk_type:
+        filtered = [w for w in filtered if wk_type.lower() in (w.get('type','') or '').lower()]
+
+    routes = []
+    for i, w in enumerate(workouts):
+        if w not in filtered:
+            continue
+        gpx = w.get('gpx_file','')
+        if not gpx:
+            continue
+        try:
+            route_data = get_workout_route(gpx)
+            pts = route_data.get('points', []) if route_data else []
+            if len(pts) < 5:
+                continue
+            # Reducir puntos para el mapa (máx 300 por ruta)
+            step = max(1, len(pts)//300)
+            reduced = pts[::step]
+            routes.append({
+                'idx':    workouts.index(w),
+                'date':   w.get('date',''),
+                'type':   w.get('type',''),
+                'km':     round(w.get('distance_km',0) or 0, 2),
+                'points': [{'lat':p['lat'],'lon':p['lon']} for p in reduced],
+            })
+        except Exception:
+            continue
+
+    return jsonify({'routes': routes})
 
 
 @workout_bp.route('/workouts/<int:idx>')

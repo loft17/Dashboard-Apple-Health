@@ -41,10 +41,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </button>
     <button class="date-today" id="btn-today">hoy</button>
-    <button class="pdf-export-btn" onclick="exportDayPDF()" title="Exportar resumen del día en PDF">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      PDF
-    </button>
+    
   </div>
 </div>
 
@@ -52,7 +49,6 @@
 
   {# Fila 1: Actividad + métricas clave #}
   <div class="ds-top">
-
     {# Anillos #}
     <div class="ds-rings-block">
       <canvas id="rings-canvas" width="120" height="120"></canvas>
@@ -66,11 +62,19 @@
     {# Métricas principales en grid #}
     <div class="ds-metrics-grid">
 
+
+      <div class="ds-metric-card">
+        <div class="ds-mc-label">Distancia</div>
+        <div class="ds-mc-value"><span id="distance-num">—</span><span class="ds-mc-unit">km</span></div>
+        <div class="ds-mc-foot" id="distance-foot" style="color:var(--muted);font-size:10px;font-family:var(--font-mono)"></div>
+      </div>
+
       <div class="ds-metric-card">
         <div class="ds-mc-label">Pasos</div>
         <div class="ds-mc-value"><span id="steps-num">—</span><span class="ds-mc-unit">pasos</span></div>
         <div class="ds-mc-bar-track"><div class="ds-mc-bar-fill" id="steps-bar" style="width:0%;background:#ff3b5c"></div></div>
         <div class="ds-mc-foot">Meta 10.000</div>
+        <div class="ds-mc-compare" id="cmp-steps"></div>
         <div class="ds-mc-mini"><div class="mini-bars" id="mini-bars"></div></div>
       </div>
 
@@ -83,6 +87,7 @@
           <canvas id="hr-chart" class="metric-chart" height="50"></canvas>
         </div>
         <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
+        <div class="ds-mc-compare" id="cmp-hr"></div>
       </div>
 
       <div class="ds-metric-card">
@@ -127,11 +132,12 @@
 
 </div>
 
-{# ── Panel de métricas adicionales — todas las categorías ── #}
-<div class="panel-header-row">
-  <h2 class="panel-header-title">Todos los datos de salud</h2>
-</div>
-<div class="extra-panel" id="extra-panel">
+{# ── Enlace a todos los datos ── #}
+<a class="extra-panel-toggle" id="extra-panel-toggle" href="/salud?date={{ date }}" style="text-decoration:none">
+  <span>Todos los datos de salud</span>
+  <svg class="extra-chevron" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+</a>
+<div class="extra-panel" id="extra-panel" style="display:none">
 
   {# Macro para una fila de métrica #}
   {# id_val: id del span de valor | label | unit | tip | icon | show_range: si muestra min-max #}
@@ -504,9 +510,15 @@ function syncButtons(d) {
 // ── Label de fecha ────────────────────────────────────────────────────────────
 function updateDateLabel(d) {
   const dt = toLocal(d);
-  const prefix = d === TODAY ? 'Hoy, ' : '';
+  const isToday = d === TODAY;
+  const prefix = isToday ? '🟢 Hoy — ' : '📅 ';
   const full = dt.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('dash-date-label').textContent = prefix + full[0].toUpperCase() + full.slice(1);
+  const lbl = document.getElementById('dash-date-label');
+  if (lbl) {
+    lbl.textContent = prefix + full[0].toUpperCase() + full.slice(1);
+    lbl.style.color  = isToday ? '#1a8a4a' : 'var(--text)';
+    lbl.style.fontWeight = isToday ? '500' : '400';
+  }
   document.getElementById('dd-label').textContent = dt.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
 }
 
@@ -518,6 +530,9 @@ function goTo(d) {
   updateDateLabel(d);
   closeDropdown();
   loadDay(d);
+  // Actualizar enlace a /salud con la fecha actual
+  const link = document.getElementById('extra-panel-toggle');
+  if (link) link.href = '/salud?date=' + d;
   history.replaceState(null,'','/dashboard?date='+d);
 }
 
@@ -853,6 +868,9 @@ function updateDashboard(data) {
   // Pasos
   document.getElementById('steps-num').textContent = fmtN(data.steps||0);
   document.getElementById('steps-bar').style.width = Math.min((data.steps||0)/100, 100)+'%';
+  // Distancia
+  const distEl=document.getElementById('distance-num'); if(distEl) distEl.textContent=(data.distance_km||0).toFixed(2);
+  const distFt=document.getElementById('distance-foot'); if(distFt) distFt.textContent=data.distance_km>0.1?(data.distance_km.toFixed(2)+' km hoy'):'';
 
   // FC
   const hr = data.hr || {};
@@ -881,6 +899,7 @@ function updateDashboard(data) {
 
   // Entrenamientos
   renderWorkouts(data.workouts);
+  updateCompare(data);
   // Métricas adicionales
   updateExtra(data.extra);
   updateAllMetrics(data.all_metrics);
@@ -890,9 +909,13 @@ function updateDashboard(data) {
 }
 
 function setLoadingState() {
-  ['hr-current','hr-avg','hrv-num','steps-num',
+  // Skeleton en lugar de '…' — más visual
+  ['hr-current','hr-avg','hrv-num','steps-num','distance-num',
    'act-move','act-ex','act-stand','sleep-total']
-    .forEach(id => { const el=document.getElementById(id); if(el) el.textContent='…'; });
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;</span>';
+    });
   ['steps-bar'].forEach(id => { const el=document.getElementById(id); if(el) el.style.width='0%'; });
   _ringPct = { 'ring-move': 0, 'ring-ex': 0, 'ring-stand': 0 };
   drawRings(_ringPct);
@@ -941,6 +964,46 @@ document.getElementById('cal-prev-month').addEventListener('click', e => { e.sto
 document.getElementById('cal-next-month').addEventListener('click', e => { e.stopPropagation(); calMonth++; if(calMonth>11){calMonth=0;calYear++;} buildCalendar(); });
 document.getElementById('cal-today-btn').addEventListener('click', () => goTo(TODAY));
 
+// ── Caché de datos mensuales para heatmap ────────────────────────────────────
+let _calData = {};
+async function loadCalMonthData(year, month) {
+  const key = `${year}-${String(month+1).padStart(2,'0')}`;
+  if (_calData[key]) return _calData[key];
+  try {
+    const r = await fetch(`/api/calendar?year=${year}&month=${month+1}`);
+    const data = await r.json();
+    _calData[key] = {};
+    data.forEach(d => { _calData[key][d.date] = d; });
+    return _calData[key];
+  } catch(e) { return {}; }
+}
+
+// ── Comparativa rápida vs semana pasada ───────────────────────────────────────
+async function loadCompare() {
+  try {
+    const r    = await fetch('/api/day/compare');
+    const base = await r.json();
+    window._compareBase = base;
+  } catch(e) {}
+}
+
+function updateCompare(data) {
+  const base = window._compareBase;
+  if (!base) return;
+  const fmtCmp = (curr, prev, id, invert=false) => {
+    const el = document.getElementById(id);
+    if (!el || !curr || !prev) return;
+    const pct = ((curr - prev) / prev * 100);
+    if (Math.abs(pct) < 1) { el.innerHTML = '<span class="cmp-flat">→ sin cambio</span>'; return; }
+    const better = invert ? pct < 0 : pct > 0;
+    const cls    = better ? 'cmp-up' : 'cmp-down';
+    const arrow  = pct > 0 ? '↑' : '↓';
+    el.innerHTML = `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs sem. ant.</span>`;
+  };
+  fmtCmp(data.steps,   base.steps, 'cmp-steps');
+  fmtCmp(data.hr?.avg, base.hr,    'cmp-hr');
+}
+
 function buildCalendar() {
   monthSel.value = calMonth; yearSel.value = calYear;
   const grid = document.getElementById('cal-grid');
@@ -956,8 +1019,22 @@ function buildCalendar() {
     if (ds===TODAY)       btn.classList.add('is-today');
     if (ds>TODAY||ds<DATE_MIN) { btn.classList.add('disabled'); btn.disabled=true; }
     else btn.addEventListener('click', () => goTo(ds));
+    btn.dataset.date = ds;
     grid.appendChild(btn);
   }
+  // Cargar puntos de actividad
+  const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}`;
+  loadCalMonthData(calYear, calMonth).then(dayData => {
+    grid.querySelectorAll('button[data-date]').forEach(btn => {
+      const d = btn.dataset.date;
+      if (!d || !dayData || !dayData[d] || !dayData[d].steps) return;
+      const steps = dayData[d].steps;
+      const dot = document.createElement('div');
+      dot.className = 'cal-dot';
+      dot.style.background = steps>=10000?'#1a8a4a':steps>=6000?'#34c759':steps>=3000?'#f59e0b':'#d1d5db';
+      btn.appendChild(dot);
+    });
+  });
 }
 
 // ── Botones de navegación — sin pointer-events CSS, solo lógica JS ────────────
@@ -2176,5 +2253,14 @@ async function exportDayPDF() {
 syncButtons(currentDate);
 updateDateLabel(currentDate);
 loadDay(currentDate);
+loadCompare();
+
+// Prefetch silencioso de días adyacentes tras 2 segundos de inactividad
+setTimeout(() => {
+  const prev = offsetDate(currentDate, -1);
+  const next = offsetDate(currentDate, +1);
+  if (prev >= DATE_MIN) fetch('/api/day?date=' + prev).catch(()=>{});
+  if (next <= TODAY)    fetch('/api/day?date=' + next).catch(()=>{});
+}, 2000);
 </script>
 {% endblock %}

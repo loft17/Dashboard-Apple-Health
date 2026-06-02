@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Resumen {{ year }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.wr-page { max-width: 800px; margin: 0 auto; }
+.wr-header {
+  text-align: center; padding: 40px 20px 30px;
+  background: linear-gradient(135deg, #111 0%, #1a1a2e 50%, #111 100%);
+  border-radius: 20px; margin-bottom: 28px; color: white;
+}
+.wr-year  { font-size: 4rem; font-weight: 800; letter-spacing: -.05em; line-height: 1; }
+.wr-sub   { font-size: 13px; color: rgba(255,255,255,.5); font-family: var(--font-mono); margin-top: 8px; text-transform: uppercase; letter-spacing: .1em; }
+
+.wr-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.wr-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 600px) { .wr-grid, .wr-grid-3 { grid-template-columns: 1fr; } }
+
+.wr-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px 24px; position: relative; overflow: hidden;
+}
+.wr-card-accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0;
+}
+.wr-card-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px;
+}
+.wr-card-val  { font-size: 2.4rem; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+.wr-card-unit { font-size: 13px; color: var(--muted); font-family: var(--font-mono); margin-left: 4px; }
+.wr-card-sub  { font-size: 11px; color: var(--dim); font-family: var(--font-mono); margin-top: 6px; }
+
+/* Gráfica de barras mensual */
+.wr-months { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin-top: 12px; }
+.wr-month-bar { flex: 1; border-radius: 3px 3px 0 0; transition: opacity .2s; cursor: default; min-width: 0; }
+.wr-month-bar:hover { opacity: .75 !important; }
+.wr-month-labels { display: flex; gap: 4px; margin-top: 4px; }
+.wr-month-lbl { flex: 1; text-align: center; font-size: 8px; color: var(--dim); font-family: var(--font-mono); }
+
+/* Tipos de entrenamiento */
+.wr-types { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.wr-type-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  font-size: 11px; font-family: var(--font-mono);
+  background: var(--surface-2); color: var(--text);
+}
+.wr-type-count { font-weight: 700; }
+
+/* Selector de año */
+.wr-year-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 24px; }
+.wr-year-btn {
+  width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); transition: all .15s;
+}
+.wr-year-btn:hover { border-color: var(--text); color: var(--text); }
+.wr-year-sel { font-size: 1.1rem; font-weight: 700; }
+
+/* PDF */
+.wr-pdf-btn { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 20px; }
+
+.wr-loading { text-align: center; padding: 80px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+
+.wr-highlight {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  color: white; border: none;
+}
+.wr-highlight .wr-card-label { color: rgba(255,255,255,.5); }
+.wr-highlight .wr-card-val   { color: white; }
+.wr-highlight .wr-card-sub   { color: rgba(255,255,255,.4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wr-page">
+  <div class="wr-year-nav">
+    <button class="wr-year-btn" id="wr-prev">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span class="wr-year-sel" id="wr-year-display">{{ year }}</span>
+    <button class="wr-year-btn" id="wr-next" {% if year >= current_year %}disabled style="opacity:.35"{% endif %}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+
+  <div id="wr-content">
+    <div class="wr-loading">Calculando tu año…</div>
+  </div>
+
+  <div class="wr-pdf-btn">
+    <button class="pdf-export-btn" onclick="exportWrappedPDF()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Exportar PDF
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let _year = {{ year }};
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const CURRENT_YEAR = {{ current_year }};
+
+function fmtN(n){ return Math.round(n||0).toLocaleString('es-ES'); }
+
+async function loadYear(year) {
+  _year = year;
+  document.getElementById('wr-year-display').textContent = year;
+  document.getElementById('wr-prev').disabled = year <= 2016;
+  document.getElementById('wr-next').disabled = year >= CURRENT_YEAR;
+  document.getElementById('wr-content').innerHTML = '<div class="wr-loading">Calculando…</div>';
+  history.replaceState({}, '', '/año?year=' + year);
+  try {
+    const r = await fetch('/api/wrapped/' + year);
+    const d = await r.json();
+    if (d.error) { document.getElementById('wr-content').innerHTML = '<div class="wr-loading">Sin datos para este año</div>'; return; }
+    render(d);
+  } catch(e) {
+    document.getElementById('wr-content').innerHTML = '<div class="wr-loading">Error al cargar</div>';
+  }
+}
+
+function render(d) {
+  // Hitos de distancia para comparación
+  function kmEquivalent(km) {
+    const hitos = [
+      { km: 42.195,  label: 'una maratón',                 emoji: '🏃' },
+      { km: 100,     label: '100 km',                       emoji: '💯' },
+      { km: 200,     label: 'la distancia Madrid–Valencia', emoji: '🗺️' },
+      { km: 627,     label: 'Madrid a Barcelona',           emoji: '🚆' },
+      { km: 800,     label: 'el Camino de Santiago',        emoji: '🛤️' },
+      { km: 1200,    label: 'Madrid a París',               emoji: '🗼' },
+      { km: 2850,    label: 'Madrid a Moscú',               emoji: '🇷🇺' },
+      { km: 5600,    label: 'Madrid a Nueva York',          emoji: '🗽' },
+      { km: 10000,   label: '¼ de vuelta al mundo',         emoji: '🌍' },
+      { km: 40075,   label: 'la vuelta al mundo',           emoji: '🌐' },
+    ];
+    // Encontrar el hito más cercano por debajo
+    let best = hitos[0];
+    for (const h of hitos) {
+      if (km >= h.km * 0.7) best = h;  // al menos 70% del hito
+      else break;
+    }
+    const pct = Math.round(km / best.km * 100);
+    if (pct >= 100) return `${best.emoji} equivale a ${best.label}`;
+    return `${best.emoji} ${pct}% de ${best.label}`;
+  }
+  const km_equiv = kmEquivalent(d.total_km);
+
+  // Sueño: mostrar en días completos de forma clara
+  const sleep_days_full = Math.floor(d.total_sleep_h / 24);
+  const sleep_rem_h     = Math.round(d.total_sleep_h % 24);
+  const sleep_str = sleep_days_full > 0
+    ? `${sleep_days_full} días y ${sleep_rem_h}h durmiendo`
+    : `${Math.round(d.total_sleep_h)}h durmiendo`;
+
+  // Gráfica de barras mensual
+  const maxMonth = Math.max(...d.steps_by_month, 1);
+  const barsHtml = d.steps_by_month.map((v, i) => {
+    const h = Math.max(4, Math.round((v / maxMonth) * 55));
+    const color = v >= 300000 ? '#1a8a4a' : v >= 200000 ? '#34c759' : v >= 100000 ? '#f59e0b' : '#d1d5db';
+    return `<div class="wr-month-bar" style="height:${h}px;background:${color};opacity:${v>0?1:.25}"
+      title="${MESES[i]}: ${fmtN(v)} pasos"></div>`;
+  }).join('');
+  const labelsHtml = MESES.map(m => `<div class="wr-month-lbl">${m}</div>`).join('');
+
+  // Tipos de entrenamiento
+  const wkColors = {'Running':'#ef4444','Walking':'#3b82f6','Cycling':'#10b981','Hiking':'#f59e0b'};
+  const typesHtml = Object.entries(d.workouts.by_type)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([t,n]) => `<div class="wr-type-pill"><span>${t}</span><span class="wr-type-count">${n}</span></div>`)
+    .join('');
+
+  // Mejor semana — convertir YYYY-WW a fecha
+  let bestWeekStr = '—';
+  if (d.best_week.week) {
+    const [y,w] = d.best_week.week.split('-');
+    const jan4 = new Date(+y, 0, 4);
+    const wStart = new Date(jan4);
+    wStart.setDate(jan4.getDate() - (jan4.getDay()||7) + 1 + (+w-1)*7);
+    bestWeekStr = `${wStart.getDate()} ${MESES_L[wStart.getMonth()]}`;
+  }
+
+  document.getElementById('wr-content').innerHTML = `
+    <div class="wr-header">
+      <div class="wr-year">${d.year}</div>
+      <div class="wr-sub">Tu año en salud · ${d.days_with_data} días con datos</div>
+    </div>
+
+    <div class="wr-grid">
+      <div class="wr-card wr-highlight">
+        <div class="wr-card-label">Pasos totales</div>
+        <div class="wr-card-val">${fmtN(d.total_steps)}</div>
+        <div class="wr-card-sub">≈ ${fmtN(d.total_steps / 365)} pasos/día de media</div>
+      </div>
+      <div class="wr-card wr-highlight">
+        <div class="wr-card-label">Kilómetros recorridos</div>
+        <div class="wr-card-val">${d.total_km.toLocaleString('es-ES')}<span class="wr-card-unit">km</span></div>
+        <div class="wr-card-sub">${km_equiv}</div>
+      </div>
+    </div>
+
+    <div class="wr-card" style="margin-bottom:14px">
+      <div class="wr-card-accent" style="background:linear-gradient(90deg,#ff3b5c,#ff9500)"></div>
+      <div class="wr-card-label">Pasos por mes</div>
+      <div class="wr-months">${barsHtml}</div>
+      <div class="wr-month-labels">${labelsHtml}</div>
+    </div>
+
+    <div class="wr-grid wr-grid-3">
+      <div class="wr-card">
+        <div class="wr-card-accent" style="background:#ff9500"></div>
+        <div class="wr-card-label">Calorías activas</div>
+        <div class="wr-card-val">${fmtN(d.total_cal)}<span class="wr-card-unit">kcal</span></div>
+        <div class="wr-card-sub">${fmtN(d.total_cal / 365)} kcal/día</div>
+      </div>
+      <div class="wr-card">
+        <div class="wr-card-accent" style="background:#a78bfa"></div>
+        <div class="wr-card-label">Pisos subidos</div>
+        <div class="wr-card-val">${fmtN(d.total_pisos)}</div>
+        <div class="wr-card-sub">≈ ${Math.round(d.total_pisos * 3)}m de altitud</div>
+      </div>
+      <div class="wr-card">
+        <div class="wr-card-accent" style="background:#34c759"></div>
+        <div class="wr-card-label">Mejor día</div>
+        <div class="wr-card-val" style="font-size:1.4rem">${fmtN(d.best_day_steps.steps)}</div>
+        <div class="wr-card-sub">pasos · ${d.best_day_steps.date || '—'}</div>
+      </div>
+    </div>
+
+    <div class="wr-grid" style="margin-top:14px">
+      <div class="wr-card">
+        <div class="wr-card-accent" style="background:#1a3fa8"></div>
+        <div class="wr-card-label">Sueño total</div>
+        <div class="wr-card-val">${d.total_sleep_h.toLocaleString('es-ES')}<span class="wr-card-unit">h</span></div>
+        <div class="wr-card-sub">${d.avg_sleep_h}h de media · ${sleep_str}</div>
+      </div>
+      <div class="wr-card">
+        <div class="wr-card-accent" style="background:#ef4444"></div>
+        <div class="wr-card-label">Corazón</div>
+        <div style="display:flex;gap:20px;margin-top:4px">
+          <div>
+            <div style="font-size:1.5rem;font-weight:800">${d.avg_fc_reposo}<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-left:3px">PPM</span></div>
+            <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">FC reposo media</div>
+          </div>
+          <div>
+            <div style="font-size:1.5rem;font-weight:800">${d.avg_hrv}<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-left:3px">ms</span></div>
+            <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">HRV medio</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${d.workouts.count > 0 ? `
+    <div class="wr-card" style="margin-top:14px">
+      <div class="wr-card-accent" style="background:linear-gradient(90deg,#ef4444,#10b981)"></div>
+      <div class="wr-card-label">Entrenamientos</div>
+      <div style="display:flex;gap:24px;align-items:baseline;margin-top:4px;flex-wrap:wrap">
+        <div><span style="font-size:2rem;font-weight:800">${d.workouts.count}</span><span style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">sesiones</span></div>
+        <div><span style="font-size:2rem;font-weight:800">${d.workouts.km.toLocaleString('es-ES')}</span><span style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">km</span></div>
+        <div><span style="font-size:2rem;font-weight:800">${d.workouts.hours}</span><span style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">horas</span></div>
+      </div>
+      <div class="wr-types">${typesHtml}</div>
+      ${d.best_workout ? (() => {
+        const bw = d.best_workout;
+        const parts = [bw.type];
+        if (bw.km > 0.1) parts.push(bw.km + ' km');
+        if (bw.dur > 0)  parts.push(bw.dur + ' min');
+        if (bw.kcal > 0) parts.push(bw.kcal + ' kcal');
+        parts.push(bw.date);
+        return `<div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--font-mono)">🏆 Mejor: ${parts.join(' · ')}</div>`;
+      })() : ''}
+    </div>` : ''}
+
+    <div class="wr-grid" style="margin-top:14px">
+      <div class="wr-card">
+        <div class="wr-card-label">🔥 Mejor semana</div>
+        <div class="wr-card-val" style="font-size:1.6rem">${fmtN(d.best_week.steps)}</div>
+        <div class="wr-card-sub">pasos · semana del ${bestWeekStr}</div>
+      </div>
+      <div class="wr-card">
+        <div class="wr-card-label">💤 Mejor noche</div>
+        <div class="wr-card-val" style="font-size:1.6rem">${d.best_sleep.h}<span class="wr-card-unit">h</span></div>
+        <div class="wr-card-sub">${d.best_sleep.date || '—'}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Navegación
+document.getElementById('wr-prev').addEventListener('click', () => { if(_year > 2016) loadYear(_year - 1); });
+document.getElementById('wr-next').addEventListener('click', () => { if(_year < CURRENT_YEAR) loadYear(_year + 1); });
+
+loadYear(_year);
+
+// PDF
+async function exportWrappedPDF() {
+  if (!window.jspdf) {
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  if (!window.html2canvas) {
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const el  = document.getElementById('wr-content');
+  const canvas = await html2canvas(el, {scale:1.5, backgroundColor:'#f7f7f5'});
+  const img = canvas.toDataURL('image/png');
+  const W = 190, H = Math.min(277, W * canvas.height / canvas.width);
+  pdf.addImage(img, 'PNG', 10, 10, W, H);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(160,160,160);
+  pdf.text(`Health Dashboard · Resumen ${_year}`, 10, 292);
+  pdf.save(`resumen_${_year}.pdf`);
+}
+</script>
+{% endblock %}

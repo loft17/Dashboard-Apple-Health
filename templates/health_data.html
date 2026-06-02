@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Datos de salud — {{ date }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/dashboard.css">
+<style>
+.hd-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  flex-wrap:wrap; gap:12px; margin-bottom:18px;
+}
+.hd-nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.hd-arrow {
+  width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--border); border-radius:8px; background:var(--surface);
+  cursor:pointer; color:var(--muted); transition:all .15s; text-decoration:none;
+}
+.hd-arrow:hover { border-color:var(--text); color:var(--text); }
+.hd-date-chip {
+  display:flex; align-items:center; gap:5px; font-size:12px;
+  font-family:var(--font-mono); border:1px solid var(--border);
+  border-radius:8px; padding:0 12px; height:30px; background:var(--surface);
+}
+.hd-back {
+  display:flex; align-items:center; gap:5px; font-size:12px;
+  font-family:var(--font-mono); color:var(--muted); text-decoration:none;
+  border:1px solid var(--border); border-radius:8px; padding:0 12px;
+  height:30px; background:var(--surface); transition:all .15s;
+}
+.hd-back:hover { border-color:var(--text); color:var(--text); }
+
+/* Resumen compacto */
+.hd-summary {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:16px 18px; margin-bottom:20px;
+  display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+}
+.hd-sum-rings { flex-shrink:0; }
+.hd-sum-metrics {
+  flex:1; display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px;
+}
+.hd-sum-metric { text-align:center; }
+.hd-sum-val { font-size:1.2rem; font-weight:700; letter-spacing:-.03em; }
+.hd-sum-key { font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-family:var(--font-mono); }
+.hd-sum-unit { font-size:10px; color:var(--muted); font-family:var(--font-mono); margin-left:2px; }
+
+/* Las secciones abiertas por defecto */
+.extra-section-body.open { display:block !important; }
+.extra-section-body { display:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Cabecera ─────────────────────────────────────────────────────────────── #}
+<div class="hd-header">
+  <div>
+    <a class="hd-back" href="/dashboard?date={{ date }}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Volver al resumen
+    </a>
+    <h2 style="font-size:1.15rem;font-weight:700;margin-top:10px;letter-spacing:-.02em">Datos de salud</h2>
+    <p id="hd-subtitle" style="font-size:14px;margin-top:3px;color:var(--muted)">{{ date }}</p>
+  </div>
+  <div class="hd-nav">
+    <a class="hd-arrow" id="hd-prev" href="#">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div class="hd-date-chip">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span id="hd-date-chip">{{ date }}</span>
+    </div>
+    <a class="hd-arrow" id="hd-next" href="#">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
+    <button class="pdf-export-btn" onclick="exportSaludPDF()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      PDF
+    </button>
+  </div>
+</div>
+
+{# ── Resumen compacto ─────────────────────────────────────────────────────── #}
+<div class="hd-summary">
+  <div class="hd-sum-rings">
+    <canvas id="hd-rings" width="100" height="100"></canvas>
+  </div>
+  <div class="hd-sum-metrics">
+    <div class="hd-sum-metric">
+      <div class="hd-sum-val">{{ steps | default('—') }}</div>
+      <div class="hd-sum-key">Pasos</div>
+    </div>
+    <div class="hd-sum-metric">
+      <div class="hd-sum-val">{{ distance or '—' }}<span class="hd-sum-unit">km</span></div>
+      <div class="hd-sum-key">Distancia</div>
+    </div>
+    <div class="hd-sum-metric">
+      <div class="hd-sum-val">{{ hr.avg if hr and hr.avg else '—' }}<span class="hd-sum-unit">PPM</span></div>
+      <div class="hd-sum-key">FC media</div>
+    </div>
+    <div class="hd-sum-metric">
+      <div class="hd-sum-val">{{ sleep.total_str if sleep and sleep.total_str else '—' }}</div>
+      <div class="hd-sum-key">Sueño</div>
+    </div>
+    <div class="hd-sum-metric">
+      <div class="hd-sum-val">{{ calories or '—' }}<span class="hd-sum-unit">kcal</span></div>
+      <div class="hd-sum-key">Calorías</div>
+    </div>
+  </div>
+</div>
+
+{# ── Secciones (mismas que el dashboard, abiertas por defecto) ─────────────── #}
+<div id="salud-panel">
+{% include '_salud_sections.html' %}
+</div>
+
+<div id="global-tooltip" class="global-tooltip"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TODAY    = (()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;})();
+const DATE_MIN = '{{ daterange.date_min if daterange else "2015-01-01" }}';
+let currentDate = '{{ date }}';
+</script>
+<script src="/static/js/health_metrics.js" defer></script>
+<script>
+// currentDate, TODAY y DATE_MIN ya definidos antes del include
+const DIAS_L   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES_L  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function fmtN(n,dec=0){return (n||0).toLocaleString('es-ES',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+function offsetDate(d,days){const dt=new Date(d+'T12:00:00');dt.setDate(dt.getDate()+days);return dt.toISOString().slice(0,10);}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────────
+const gTooltip=document.getElementById('global-tooltip');
+let _canvasHover=false;
+function showTooltip(x,y,html){gTooltip.innerHTML=html;gTooltip.style.display='block';gTooltip.style.left=(x+12)+'px';gTooltip.style.top=(y-10)+'px';}
+function hideTooltip(){if(!_canvasHover)gTooltip.style.display='none';}
+function hideTooltipForce(){_canvasHover=false;gTooltip.style.display='none';}
+
+// ── _pendingCharts y registerChart (misma firma que _sections_js.html) ──────────
+const _pendingCharts = {};
+function registerChart(sectionId, canvasId, wrapId, series, color, fill, labelFn) {
+  if (!series || !series.length) return;
+  // En /salud las secciones están siempre visibles — dibujar directamente
+  const draw = () => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    // Mostrar el wrap si existe
+    const wrap = document.getElementById(wrapId);
+    if (wrap) wrap.style.display = 'block';
+    drawLineChart(canvasId, series, color, fill, labelFn);
+    if (canvas) canvas._redraw = () => drawLineChart(canvasId, series, color, fill, labelFn);
+  };
+  // Pequeño delay para que el DOM esté listo
+  setTimeout(draw, 120);
+}
+
+// ── toggleSection (para el acordeón) ──────────────────────────────────────────
+// Stub para funciones del dashboard no necesarias en salud
+function openDashECG() { window.location.href = '/ecg?date=' + currentDate; }
+
+function toggleSection(id){
+  const body=document.getElementById(id),chev=document.getElementById('chev-'+id);
+  const willOpen=!body.classList.contains('open');
+  body.classList.toggle('open',willOpen);
+  if(chev)chev.style.transform=willOpen?'rotate(180deg)':'rotate(0deg)';
+  if(willOpen&&_pendingCharts[id]){_pendingCharts[id].forEach(fn=>setTimeout(fn,80));_pendingCharts[id]=[];}
+  if(willOpen&&id==='sec-sueno'){const c=document.getElementById('sleep-phases-canvas');if(c&&c._sleepSegments)setTimeout(()=>drawSleepPhases(c._sleepSegments),80);}
+  ['steps-hour-canvas','hr-day-canvas'].forEach(cid=>{const cc=document.getElementById(cid);if(cc&&cc._redrawSection)setTimeout(cc._redrawSection,80);});
+}
+
+// ── Tarjetas expandibles ───────────────────────────────────────────────────────
+document.addEventListener('click',e=>{
+  const card=e.target.closest('.es-metric-card');if(!card)return;
+  const cw=card.querySelector('[id$="-chart-wrap"]');if(!cw)return;
+  const wasExp=card.classList.contains('expanded');
+  card.closest('.es-metric-grid')?.querySelectorAll('.es-metric-card.expanded').forEach(c=>{c.classList.remove('expanded');const w=c.querySelector('[id$="-chart-wrap"]');if(w)w.style.display='none';});
+  if(!wasExp){card.classList.add('expanded');cw.style.display='block';const cv=cw.querySelector('canvas');if(cv)setTimeout(()=>{if(cv._redraw)cv._redraw();},80);}
+});
+document.addEventListener('mouseover',e=>{const card=e.target.closest('.es-metric-card');if(!card||!card._tip)return;showTooltip(e.clientX,e.clientY,card._tip);gTooltip.style.maxWidth='260px';gTooltip.style.whiteSpace='normal';_canvasHover=true;});
+document.addEventListener('mousemove',e=>{const card=e.target.closest('.es-metric-card');if(card&&card._tip){gTooltip.style.left=(e.clientX+12)+'px';gTooltip.style.top=(e.clientY-10)+'px';}});
+document.addEventListener('mouseout',e=>{const card=e.target.closest('.es-metric-card');if(card&&card._tip&&!card.contains(e.relatedTarget)){_canvasHover=false;hideTooltip();}});
+
+// Guardar tooltips
+document.querySelectorAll('.es-metric-card[title]').forEach(card=>{card._tip=card.getAttribute('title');card.removeAttribute('title');});
+
+// ── drawLineChart ──────────────────────────────────────────────────────────────
+function drawLineChart(canvasId,series,color,fill,labelFn){
+  const canvas=document.getElementById(canvasId);if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.parentElement.offsetWidth||400;canvas.width=W;const H=canvas.height;
+  ctx.clearRect(0,0,W,H);if(!series||series.length<2)return;
+  const vals=series.map(d=>d.v!=null?d.v:0);
+  const minV=Math.min(...vals),maxV=Math.max(...vals),rng=maxV-minV||1;
+  const padX=2,padY=4;
+  const pts=series.map((d,i)=>({x:padX+(i/(series.length-1))*(W-padX*2),y:H-padY-(((d.v!=null?d.v:0)-minV)/rng)*(H-padY*2),d}));
+  const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,fill);grad.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath();ctx.moveTo(pts[0].x,H);ctx.lineTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+  ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+  canvas.onmousemove=e=>{_canvasHover=true;const rect=canvas.getBoundingClientRect();const scX=canvas.width/rect.width;const mx=(e.clientX-rect.left)*scX;let best=0,bestD=Infinity;pts.forEach((p,i)=>{const d=Math.abs(p.x-mx);if(d<bestD){bestD=d;best=i;}});showTooltip(e.clientX,e.clientY,labelFn(pts[best].d));};
+  canvas.onmouseleave=()=>hideTooltipForce();
+}
+
+function setM(id,metric,dec=0,mult=1){const el=document.getElementById('m-'+id);if(!el)return;const n=metric?.value??metric;if(n==null){el.textContent='—';return;}const v=typeof n==='number'?n*mult:parseFloat(n)*mult;el.textContent=isNaN(v)?'—':dec===0?Math.round(v).toLocaleString('es-ES'):fmtN(v,dec);}
+function setTxt(id,val){const el=document.getElementById(id);if(el)el.textContent=val||'—';}
+
+// ── Anillos del resumen ────────────────────────────────────────────────────────
+(function(){
+  const canvas=document.getElementById('hd-rings');if(!canvas)return;
+  const ctx=canvas.getContext('2d'),W=100,H=100,cx=50,cy=50;
+  const RINGS=[
+    {r:42,color:'#ff3b5c',bg:'#3d0010',val:{{ calories or 0 }},goal:500},
+    {r:30,color:'#34c759',bg:'#0a3018',val:{{ ex_min or 0 }},goal:30},
+    {r:18,color:'#30b0c7',bg:'#003040',val:{{ stand or 0 }},goal:12}
+  ];
+  const SW=9;
+  function draw(pcts){ctx.clearRect(0,0,W,H);RINGS.forEach((ring,ri)=>{ctx.beginPath();ctx.arc(cx,cy,ring.r,0,Math.PI*2);ctx.strokeStyle=ring.bg;ctx.lineWidth=SW;ctx.stroke();const pct=Math.min(pcts[ri],1);if(pct>0){ctx.beginPath();ctx.arc(cx,cy,ring.r,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);ctx.strokeStyle=ring.color;ctx.lineWidth=SW;ctx.lineCap='round';ctx.stroke();}});}
+  const targets=RINGS.map(r=>Math.min(r.val/r.goal,1.05));
+  const cur=[0,0,0];const t0=performance.now();
+  function step(now){const t=Math.min((now-t0)/1000,1),e=1-Math.pow(1-t,3);cur.forEach((_,i)=>{cur[i]=targets[i]*e;});draw(cur);if(t<1)requestAnimationFrame(step);}
+  requestAnimationFrame(step);
+})();
+
+// ── Cabecera de fecha ──────────────────────────────────────────────────────────
+(function(){
+  const dt=new Date(currentDate+'T12:00:00');
+  const isToday=currentDate===TODAY;
+  const full=`${DIAS_L[dt.getDay()]}, ${dt.getDate()} de ${MESES_L[dt.getMonth()]} de ${dt.getFullYear()}`;
+  const sub=document.getElementById('hd-subtitle');
+  if(sub){sub.textContent=(isToday?'🟢 Hoy — ':'')+full;sub.style.color=isToday?'#1a8a4a':'var(--muted)';}
+  const chip=document.getElementById('hd-date-chip');
+  if(chip)chip.textContent=dt.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+})();
+
+// ── Navegación ─────────────────────────────────────────────────────────────────
+function goTo(d){if(d>=DATE_MIN&&d<=TODAY)window.location.href='/salud?date='+d;}
+document.getElementById('hd-prev').addEventListener('click',e=>{e.preventDefault();goTo(offsetDate(currentDate,-1));});
+document.getElementById('hd-next').addEventListener('click',e=>{e.preventDefault();goTo(offsetDate(currentDate,+1));});
+if(currentDate<=DATE_MIN)document.getElementById('hd-prev').style.opacity='.35';
+if(currentDate>=TODAY)document.getElementById('hd-next').style.opacity='.35';
+
+// ── Cargar datos dinámicos (gráficas, métricas detalladas) ────────────────────
+async function loadDayData() {
+  try {
+    const res  = await fetch('/api/day?date=' + currentDate);
+    const data = await res.json();
+    if (data.all_metrics) updateAllMetrics(data.all_metrics, data);
+    const sleep=data.sleep||{};
+    if(sleep.total_str){setTxt('sueno-total',sleep.total_str);setTxt('sleep-total',sleep.total_str);setTxt('sleep-deep',sleep.deep_min!=null?Math.round(sleep.deep_min)+' min':null);setTxt('sleep-rem',sleep.rem_min!=null?Math.round(sleep.rem_min)+' min':null);}
+    if(sleep.segments){const t=document.getElementById('sleep-apple-total');if(t)t.textContent=sleep.total_str||'—';drawSleepPhases(sleep.segments);}
+    const fcRaw=data.all_metrics?.corazon?.fc?.raw;
+    if(fcRaw&&fcRaw.length>1){const b=document.getElementById('hr-day-block');if(b)b.style.display='block';const mn=Math.min(...fcRaw.map(d=>d.v)),mx=Math.max(...fcRaw.map(d=>d.v)),av=Math.round(fcRaw.reduce((s,d)=>s+d.v,0)/fcRaw.length);drawSectionLineChart('hr-day-canvas','hr-day-tip','hr-day-xaxis','hr-day-sub',fcRaw,'#ff3b5c','rgba(255,59,92,0.12)',d=>`<b>${d.t}</b><br>${d.v} PPM`,`${mn}–${mx} PPM · media ${av} PPM`);}
+    const st=data.all_metrics?.actividad?.pasos?.series;
+    if(st&&st.length>0){const b=document.getElementById('steps-hour-block');if(b)b.style.display='block';const tot=Math.round(st.reduce((s,d)=>s+d.v,0));drawStepsBarChart('steps-hour-canvas','steps-hour-tip','steps-hour-xaxis','steps-hour-sub',st,`${tot.toLocaleString('es-ES')} pasos totales`);}
+  } catch(e){console.error('loadDayData:',e);}
+}
+loadDayData();
+
+// ── Abrir secciones por defecto y rotar chevrons ───────────────────────────────
+document.querySelectorAll('.extra-section-body.open').forEach(body=>{
+  const id=body.id;
+  const chev=document.getElementById('chev-'+id);
+  if(chev)chev.style.transform='rotate(180deg)';
+});
+
+// ── PDF ────────────────────────────────────────────────────────────────────────
+async function exportSaludPDF(){
+  if(!window.jspdf){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const PW=190,ML=10;let y=0;
+  const getEl=id=>document.getElementById(id)?.textContent?.trim()||'—';
+  const dt=new Date(currentDate+'T12:00:00');
+  pdf.setFillColor(17,17,17);pdf.rect(0,0,210,20,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(13);pdf.setTextColor(255,255,255);pdf.text('Datos de salud',ML,9);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(180,180,180);
+  pdf.text(dt.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),ML,15);
+  y=24;
+  const sec=t=>{if(y>268){pdf.addPage();y=14;}pdf.setFillColor(240,240,240);pdf.rect(ML,y,PW,6,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(60,60,60);pdf.text(t.replace(/[^\w\s]/g,'').trim().toUpperCase(),ML+2,y+4.2);y+=9;};
+  const row=(l,v,u='')=>{if(!v||v==='—')return;if(y>272){pdf.addPage();y=14;}pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(100,100,100);pdf.text(l,ML,y);pdf.setFont('helvetica','bold');pdf.setTextColor(20,20,20);pdf.text(`${v}${u?' '+u:''}`,ML+90,y);y+=6;};
+  const addC=(id,h=35)=>{const c=document.getElementById(id);if(!c||c.width===0)return;try{if(y+h>272){pdf.addPage();y=14;}pdf.addImage(c.toDataURL('image/png'),'PNG',ML,y,PW,h);y+=h+4;}catch(e){}};
+  sec('Actividad');row('Pasos',getEl('m-pasos'));row('Distancia',getEl('m-distancia'),'km');row('Calorías activas',getEl('m-cal-activas'),'kcal');row('Ejercicio',getEl('m-ejercicio-min'),'min');row('De pie',getEl('m-depie-horas'),'h');addC('steps-hour-canvas');y+=2;
+  sec('Corazón');row('FC media',getEl('m-fc'),'PPM');row('FC reposo',getEl('m-fc-reposo'),'PPM');row('HRV',getEl('m-hrv'),'ms');row('SpO₂',getEl('m-spo2'),'%');addC('hr-day-canvas');y+=2;
+  sec('Sueño');row('Total',getEl('m-sleep-total'));row('Profundo',getEl('m-sleep-deep'));row('REM',getEl('m-sleep-rem'));addC('sleep-phases-canvas',40);y+=2;
+  sec('Marcha');row('Velocidad',getEl('m-velocidad'),'km/h');row('Longitud paso',getEl('m-zancada'),'cm');row('Estabilidad',getEl('m-estabilidad'),'%');y+=2;
+  sec('Cuerpo y salud');row('Peso',getEl('m-peso'),'kg');row('IMC',getEl('m-imc'),'kg/m²');row('Agua',getEl('m-agua'),'mL');row('Luz diurna',getEl('m-luz'),'min');
+  const pages=pdf.getNumberOfPages();
+  for(let i=1;i<=pages;i++){pdf.setPage(i);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(160,160,160);pdf.line(ML,283,ML+PW,283);pdf.text(`Health Dashboard · ${currentDate} · Pág. ${i}/${pages}`,ML,288);}
+  pdf.save(`salud_${currentDate}.pdf`);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+{% block title %}Ajustes{% endblock %}
+
+{% block extra_css %}
+<style>
+.sett-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 640px) { .sett-layout { grid-template-columns: 1fr; } }
+
+/* ── Menú lateral ───────────────────────────────────────────────────────────── */
+.sett-nav {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; position: sticky; top: 72px;
+}
+.sett-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  text-decoration: none; border-left: 3px solid transparent;
+  transition: all .15s;
+}
+.sett-nav-item:hover { color: var(--text); background: var(--surface-2); }
+.sett-nav-item.active {
+  color: var(--text); background: var(--accent-dim);
+  border-left-color: var(--text);
+}
+.sett-nav-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.sett-nav-icon { width: 16px; text-align: center; font-size: 15px; }
+
+/* ── Panel derecho ─────────────────────────────────────────────────────────── */
+.sett-panel { display: none; }
+.sett-panel.active { display: block; }
+
+.sett-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin-bottom: 16px;
+}
+.sett-card-head {
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sett-card-icon { font-size: 18px; }
+.sett-card-title { font-size: 13px; font-weight: 600; }
+.sett-card-sub { font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 1px; }
+.sett-card-body { padding: 18px; }
+
+/* Stats de BD */
+.sett-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.sett-stat {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; text-align: center;
+}
+.sett-stat-num { font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; }
+.sett-stat-key { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+.sett-info-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--font-mono); font-size: 12px;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.sett-info-row:last-child { border-bottom: none; }
+.sett-info-key { color: var(--muted); }
+.sett-info-val { font-weight: 600; }
+
+/* Drop zone */
+.sett-drop {
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: all .2s; font-family: var(--font-mono);
+  font-size: 12px; color: var(--muted); margin-bottom: 12px;
+}
+.sett-drop:hover, .sett-drop.drag-over {
+  border-color: var(--text); color: var(--text); background: var(--accent-dim);
+}
+.sett-drop-icon { font-size: 30px; margin-bottom: 8px; }
+
+.sett-progress { display: none; margin-top: 10px; }
+.sett-bar-track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.sett-bar-fill  { height: 100%; background: var(--text); border-radius: 3px; width: 0%; transition: width .3s; }
+.sett-bar-msg   { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 6px; }
+.sett-log {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; margin-top: 10px; font-family: var(--font-mono);
+  font-size: 11px; color: var(--muted); max-height: 140px;
+  overflow-y: auto; line-height: 1.8; display: none;
+}
+
+/* Formulario */
+.sett-field { margin-bottom: 12px; }
+.sett-label {
+  display: block; font-size: 11px; font-family: var(--font-mono);
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 5px;
+}
+.sett-input {
+  width: 100%; height: 38px; padding: 0 11px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); font-size: 13px; color: var(--text);
+  outline: none; transition: border-color .15s;
+}
+.sett-input:focus { border-color: var(--text); }
+.sett-btn {
+  width: 100%; height: 38px; background: var(--text); color: var(--bg);
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s; margin-top: 4px;
+}
+.sett-btn:hover { opacity: .85; }
+.sett-msg {
+  padding: 8px 12px; border-radius: 8px; font-size: 12px;
+  font-family: var(--font-mono); margin-top: 10px; display: none;
+}
+.sett-msg.ok    { background: #f0fdf4; border: 1px solid #bbf7d0; color: #1a8a4a; }
+.sett-msg.error { background: #fef2f2; border: 1px solid #fecaca; color: #c0392b; }
+
+.sett-divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+.sett-page-title {
+  font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em;
+  margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sett-layout">
+
+  {# ── Menú lateral ──────────────────────────────────────────────────────────── #}
+  <nav class="sett-nav">
+    <a class="sett-nav-item {% if section == 'import' %}active{% endif %}"
+       href="/ajustes?s=import">
+      <span class="sett-nav-icon">📦</span> Importar datos
+    </a>
+    <a class="sett-nav-item {% if section == 'creds' %}active{% endif %}"
+       href="/ajustes?s=creds">
+      <span class="sett-nav-icon">🔐</span> Credenciales
+    </a>
+    <div class="sett-nav-sep"></div>
+    <a class="sett-nav-item {% if section == 'obsidian' %}active{% endif %}"
+       href="/ajustes?s=obsidian">
+      <span class="sett-nav-icon">🗒️</span> Obsidian
+    </a>
+  </nav>
+
+  {# ── Panel derecho ─────────────────────────────────────────────────────────── #}
+  <div>
+
+    {# ── IMPORTAR ──────────────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'import' %}active{% endif %}">
+      <div class="sett-page-title">Importar datos</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🗄️</span>
+          <div>
+            <div class="sett-card-title">Estado de la base de datos</div>
+            <div class="sett-card-sub">Resumen de la última importación</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          {% if stats %}
+          <div class="sett-stats-grid">
+            <div class="sett-stat">
+              <div class="sett-stat-num">{{ stats.record_count | default('—') }}</div>
+              <div class="sett-stat-key">Registros</div>
+            </div>
+            <div class="sett-stat">
+              <div class="sett-stat-num">{{ stats.day_count | default('—') }}</div>
+              <div class="sett-stat-key">Días</div>
+            </div>
+          </div>
+          <div>
+            {% if stats.first_date %}
+            <div class="sett-info-row"><span class="sett-info-key">Primer registro</span><span class="sett-info-val">{{ stats.first_date }}</span></div>
+            {% endif %}
+            {% if stats.last_date %}
+            <div class="sett-info-row"><span class="sett-info-key">Último registro</span><span class="sett-info-val">{{ stats.last_date }}</span></div>
+            {% endif %}
+            {% if stats.last_import %}
+            <div class="sett-info-row"><span class="sett-info-key">Última importación</span><span class="sett-info-val">{{ stats.last_import[:16].replace('T',' ') }}</span></div>
+            {% endif %}
+            {% if stats.source_count %}
+            <div class="sett-info-row"><span class="sett-info-key">Fuentes</span><span class="sett-info-val">{{ stats.source_count }}</span></div>
+            {% endif %}
+          </div>
+          {% else %}
+          <p style="color:var(--muted);font-family:var(--font-mono);font-size:12px">Sin datos importados aún</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">📦</span>
+          <div>
+            <div class="sett-card-title">Subir exportación de Apple Health</div>
+            <div class="sett-card-sub">Archivo .zip descargado desde la app Salud</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <div class="sett-drop" id="sett-drop" onclick="document.getElementById('sett-file').click()">
+            <div class="sett-drop-icon">📂</div>
+            <div>Arrastra el ZIP aquí</div>
+            <div style="margin-top:4px;font-size:10px">o pulsa para seleccionar</div>
+            <input type="file" id="sett-file" accept=".zip" style="display:none">
+          </div>
+          <div class="sett-progress" id="sett-progress">
+            <div class="sett-bar-track"><div class="sett-bar-fill" id="sett-fill"></div></div>
+            <div class="sett-bar-msg" id="sett-bar-msg">Preparando…</div>
+          </div>
+          <div class="sett-log" id="sett-log"></div>
+        </div>
+      </div>
+    </div>
+
+    {# ── CREDENCIALES ──────────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'creds' %}active{% endif %}">
+      <div class="sett-page-title">Credenciales y perfil</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">👤</span>
+          <div>
+            <div class="sett-card-title">Datos de perfil</div>
+            <div class="sett-card-sub">Tu nombre e información personal</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <div class="sett-field">
+            <label class="sett-label">Nombre</label>
+            <input class="sett-input" type="text" id="p-name"
+                   value="{{ creds.display_name if creds and creds.display_name else '' }}"
+                   placeholder="Tu nombre completo">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Email</label>
+            <input class="sett-input" type="email" id="p-email"
+                   value="{{ creds.email if creds and creds.email else '' }}"
+                   placeholder="tu@email.com">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Año de nacimiento</label>
+            <input class="sett-input" type="number" id="p-birth"
+                   value="{{ creds.birth_year if creds and creds.birth_year else '' }}"
+                   placeholder="1990" min="1920" max="2010">
+          </div>
+          <button class="sett-btn" onclick="saveProfile()">Guardar perfil</button>
+          <div class="sett-msg" id="profile-msg"></div>
+        </div>
+      </div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🔐</span>
+          <div>
+            <div class="sett-card-title">Cambiar acceso</div>
+            <div class="sett-card-sub">Usuario y contraseña del dashboard</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <div class="sett-field">
+            <label class="sett-label">Contraseña actual</label>
+            <input class="sett-input" type="password" id="cp-current" autocomplete="current-password">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Nuevo usuario</label>
+            <input class="sett-input" type="text" id="cp-user"
+                   value="{{ creds.username if creds else '' }}" autocomplete="username">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Nueva contraseña</label>
+            <input class="sett-input" type="password" id="cp-pass" autocomplete="new-password">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Confirmar contraseña</label>
+            <input class="sett-input" type="password" id="cp-confirm" autocomplete="new-password">
+          </div>
+          <button class="sett-btn" onclick="saveCredentials()">Cambiar acceso</button>
+          <div class="sett-msg" id="cp-msg"></div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);font-family:var(--font-mono);line-height:1.6">
+            También puedes usar variables de entorno:<br>
+            <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">HEALTH_USER=x HEALTH_PASSWORD=y python app.py</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── OBSIDIAN ──────────────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'obsidian' %}active{% endif %}">
+      <div class="sett-page-title">Exportar a Obsidian</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🗒️</span>
+          <div>
+            <div class="sett-card-title">Nota Markdown diaria</div>
+            <div class="sett-card-sub">Compatible con Obsidian y cualquier editor Markdown</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <p style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-bottom:16px;line-height:1.6">
+            Descarga un fichero <code>.md</code> con las métricas del día seleccionado.
+            Incluye actividad, corazón, sueño, entrenamientos y una sección de notas vacía.
+          </p>
+          <div class="sett-field">
+            <label class="sett-label">Fecha</label>
+            <input class="sett-input" type="date" id="obs-date"
+                   value="{{ today }}" max="{{ today }}">
+          </div>
+          <a id="obs-btn" class="sett-btn"
+             style="display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none"
+             href="#" onclick="downloadObsidian(event)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar nota Markdown
+          </a>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);font-family:var(--font-mono);line-height:1.6">
+            Ruta sugerida en tu vault:<br>
+            <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">Diario/Salud/{{ today[:4] }}/salud_YYYY-MM-DD.md</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Importación ──────────────────────────────────────────────────────────────
+const drop    = document.getElementById('sett-drop');
+const fileIn  = document.getElementById('sett-file');
+const prog    = document.getElementById('sett-progress');
+const fill    = document.getElementById('sett-fill');
+const barMsg  = document.getElementById('sett-bar-msg');
+const logEl   = document.getElementById('sett-log');
+
+if (drop) {
+  drop.addEventListener('dragover',  e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag-over'); if (e.dataTransfer.files[0]) startUpload(e.dataTransfer.files[0]); });
+  fileIn.addEventListener('change', () => { if (fileIn.files[0]) startUpload(fileIn.files[0]); });
+}
+
+async function startUpload(file) {
+  drop.style.display   = 'none';
+  prog.style.display   = 'block';
+  logEl.style.display  = 'block';
+  logEl.innerHTML      = '';
+  barMsg.textContent   = 'Subiendo archivo…';
+  fill.style.width     = '0%';
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/upload', {method:'POST', body:fd});
+  if (!res.ok) { barMsg.textContent = '✗ Error al subir'; drop.style.display='block'; return; }
+  const es = new EventSource('/progress-stream');
+  es.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.pct !== undefined) fill.style.width = d.pct + '%';
+    if (d.msg) { barMsg.textContent = d.msg; const ln=document.createElement('div'); ln.textContent=d.msg; logEl.appendChild(ln); logEl.scrollTop=logEl.scrollHeight; }
+    if (d.event === 'done')  { es.close(); fill.style.width='100%'; barMsg.textContent='✓ Importación completada'; setTimeout(()=>location.reload(), 1500); }
+    if (d.event === 'error') { es.close(); barMsg.textContent='✗ Error: '+(d.msg||''); drop.style.display='block'; }
+  };
+}
+
+// ── Perfil ────────────────────────────────────────────────────────────────────
+async function saveProfile() {
+  const display_name = document.getElementById('p-name').value.trim();
+  const email        = document.getElementById('p-email').value.trim();
+  const birth_year   = document.getElementById('p-birth').value.trim();
+  const msg          = document.getElementById('profile-msg');
+  const res  = await fetch('/api/auth/save-profile', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({display_name, email, birth_year})
+  });
+  const data = await res.json();
+  msg.className = 'sett-msg ' + (data.ok ? 'ok' : 'error');
+  msg.textContent = data.ok ? '✓ Perfil guardado correctamente' : (data.error || 'Error');
+  msg.style.display = 'block';
+}
+
+// ── Credenciales ──────────────────────────────────────────────────────────────
+async function saveCredentials() {
+  const current  = document.getElementById('cp-current').value;
+  const username = document.getElementById('cp-user').value.trim();
+  const password = document.getElementById('cp-pass').value;
+  const confirm  = document.getElementById('cp-confirm').value;
+  const msg      = document.getElementById('cp-msg');
+  if (!current) { showMsg('cp-msg','error','Introduce tu contraseña actual'); return; }
+  const res  = await fetch('/api/auth/change-password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({current, username, password, confirm})
+  });
+  const data = await res.json();
+  if (data.ok) { showMsg('cp-msg','ok','✓ Acceso actualizado. Vuelve a iniciar sesión.'); setTimeout(()=>{ window.location='/logout'; }, 2000); }
+  else showMsg('cp-msg','error', data.error || 'Error desconocido');
+}
+
+function showMsg(id, type, text) {
+  const el = document.getElementById(id);
+  el.className = 'sett-msg ' + type;
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+// ── Obsidian ──────────────────────────────────────────────────────────────────
+function downloadObsidian(e) {
+  e.preventDefault();
+  const date = document.getElementById('obs-date')?.value;
+  if (date) window.location.href = '/api/settings/obsidian-export?date=' + date;
+}
+</script>
+{% endblock %}

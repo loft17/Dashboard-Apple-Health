@@ -407,3 +407,17 @@ def sleep_hist2():
         'history_month': result_month,
         'calculation_examples': examples
     })
+
+@debug_bp.route('/api/debug/temp-check')
+def temp_check():
+    from services.db import get_conn, DB_FILE
+    if not DB_FILE.exists():
+        return jsonify({'error': 'No DB'})
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT type, COUNT(*) as n, MIN(date_day) as first, MAX(date_day) as last
+            FROM records
+            WHERE type LIKE '%Temp%' OR type LIKE '%temp%' OR type LIKE '%Wrist%'
+            GROUP BY type
+        """).fetchall()
+    return jsonify([dict(r) for r in rows])

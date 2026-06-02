@@ -1,122 +1,419 @@
 {% extends "base.html" %}
-{% block title %}Inicio{% endblock %}
+{% block title %}Inicio — Health Dashboard{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+<link rel="stylesheet" href="/static/css/dashboard.css">
+<style>
+/* ── Hero del día ─────────────────────────────────────────────────────────── */
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; } }
+
+/* ── Resumen del día (izquierda) ─────────────────────────────────────────── */
+.home-today {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px 22px;
+}
+.home-today-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.home-today-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--muted); font-family: var(--font-mono);
+}
+.home-today-date {
+  font-size: 12px; color: var(--muted); font-family: var(--font-mono);
+}
+.home-today-link {
+  font-size: 12px; font-family: var(--font-mono); color: var(--muted);
+  text-decoration: none; border: 1px solid var(--border);
+  border-radius: 7px; padding: 3px 10px; transition: all .15s;
+}
+.home-today-link:hover { border-color: var(--text); color: var(--text); }
+
+.home-activity {
+  display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px;
+}
+.home-rings-wrap { flex-shrink: 0; }
+.home-rings-legend {
+  display: flex; flex-direction: column; gap: 5px; justify-content: center;
+}
+.home-rl-row { display: flex; align-items: center; gap: 7px; }
+.home-rl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.home-rl-key { font-size: 11px; color: var(--muted); font-family: var(--font-mono); flex:1; }
+.home-rl-val { font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+
+.home-metrics-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr));
+  gap: 8px;
+}
+.home-metric {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.home-metric-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-family: var(--font-mono); margin-bottom: 4px;
+}
+.home-metric-value {
+  font-size: 1.3rem; font-weight: 700; letter-spacing: -.03em; color: var(--text);
+}
+.home-metric-unit {
+  font-size: 10px; color: var(--muted); font-family: var(--font-mono);
+  margin-left: 2px;
+}
+
+/* ── Importar (derecha) ───────────────────────────────────────────────────── */
+.home-import-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.home-import-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--muted); font-family: var(--font-mono);
+}
+.home-import-stats {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.home-import-stat {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.home-import-stat-key { color: var(--muted); }
+.home-import-stat-val { font-weight: 600; color: var(--text); }
+
+/* Drop zone */
+.home-drop {
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 24px 16px; text-align: center;
+  cursor: pointer; transition: all .2s;
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+}
+.home-drop:hover, .home-drop.drag-over {
+  border-color: var(--text); color: var(--text); background: var(--accent-dim);
+}
+.home-drop-icon { font-size: 28px; margin-bottom: 8px; }
+.home-drop input { display: none; }
+
+.home-progress { display: none; }
+.home-progress-bar-track {
+  height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden;
+}
+.home-progress-bar-fill {
+  height: 100%; background: var(--text); border-radius: 3px;
+  width: 0%; transition: width .3s ease;
+}
+.home-progress-msg {
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ── Stats DB ─────────────────────────────────────────────────────────────── */
+.home-db-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
+}
+.home-db-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; text-align: center;
+}
+.home-db-num { font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; }
+.home-db-key {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-family: var(--font-mono); margin-top: 2px;
+}
+
+/* Nav shortcuts */
+.home-shortcuts {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;
+}
+.home-shortcut {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 10px;
+  text-decoration: none; color: var(--text); font-size: 13px;
+  font-weight: 500; transition: all .15s; flex: 1; min-width: 120px;
+}
+.home-shortcut:hover { border-color: var(--text); background: var(--surface); }
+.home-shortcut-icon { font-size: 18px; }
+</style>
 {% endblock %}
 
 {% block content %}
 
-<header class="hero">
-  <div class="logo-mark">
-    <div class="logo-icon">
-      <div class="logo-pulse"></div>
-      <svg viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
-    </div>
-    <span class="logo-text">Health Dashboard</span>
-  </div>
-  <h1>Tus datos.<br>Tu servidor.</h1>
-  <p class="subtitle">// apple_health · uso personal · debian</p>
-</header>
-
-{% if stats %}
-<div class="stats-bar">
-  <div class="stat-item">
-    <div class="stat-value">{{ stats.total_records | default('—') }}</div>
-    <div class="stat-label">Registros</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-value">{{ stats.metrics_count | default('—') }}</div>
-    <div class="stat-label">Métricas</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-value">{{ stats.date_range_days | default('—') }}d</div>
-    <div class="stat-label">Historial</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-value">{{ stats.last_sync | default('—') }}</div>
-    <div class="stat-label">Último sync</div>
-  </div>
-</div>
-{% else %}
-<div class="empty-state">
-  <div class="empty-dot"></div>
-  <span class="empty-text">// sin datos · sube tu primer export.zip</span>
+{% if not has_db %}
+{# ── Sin datos aún ─────────────────────────────────────────────────────────── #}
+<div style="text-align:center;padding:60px 20px">
+  <div style="font-size:48px;margin-bottom:16px">❤️</div>
+  <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:8px">Bienvenido a Health Dashboard</h2>
+  <p style="color:var(--muted);font-family:var(--font-mono);font-size:12px;max-width:360px;margin:0 auto 28px">
+    Importa tu exportación de Apple Health para empezar a ver tus datos.
+  </p>
 </div>
 {% endif %}
 
-<div class="actions">
-  <div class="card primary" onclick="toggleUpload()">
-    <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
-    <div class="card-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
+<div class="home-grid">
+
+  {# ── Resumen del día ──────────────────────────────────────────────────────── #}
+  <div class="home-today">
+    <div class="home-today-header">
+      <span class="home-today-title">Hoy</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="home-today-date" id="home-date-label"></span>
+        {% if has_db %}
+        <a class="home-today-link" href="/dashboard">Ver detalle →</a>
+        {% endif %}
+      </div>
     </div>
-    <div class="card-title">Subir export.zip</div>
-    <div class="card-desc">Importa un nuevo export de Apple Health. Solo se añaden registros nuevos.</div>
+
+    {% if has_db and today_data %}
+    <div class="home-activity">
+      <div class="home-rings-wrap">
+        <canvas id="home-rings" width="110" height="110"></canvas>
+      </div>
+      <div class="home-rings-legend">
+        <div class="home-rl-row">
+          <span class="home-rl-dot" style="background:#ff3b5c"></span>
+          <span class="home-rl-key">Movimiento</span>
+          <span class="home-rl-val" id="h-move" style="color:#ff3b5c">
+            {{ today_data.calories or '—' }} kcal
+          </span>
+        </div>
+        <div class="home-rl-row">
+          <span class="home-rl-dot" style="background:#34c759"></span>
+          <span class="home-rl-key">Ejercicio</span>
+          <span class="home-rl-val" id="h-ex" style="color:#34c759">
+            {{ today_data.ex_min or '—' }} min
+          </span>
+        </div>
+        <div class="home-rl-row">
+          <span class="home-rl-dot" style="background:#30b0c7"></span>
+          <span class="home-rl-key">De pie</span>
+          <span class="home-rl-val" id="h-stand" style="color:#30b0c7">
+            {{ today_data.stand or '—' }} / 12 h
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-metrics-grid">
+      <div class="home-metric">
+        <div class="home-metric-label">Pasos</div>
+        <div class="home-metric-value">
+          {{ "{:,}".format(today_data.steps or 0).replace(',','.') }}
+        </div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Distancia</div>
+        <div class="home-metric-value">
+          {{ today_data.distance or '—' }}<span class="home-metric-unit">km</span>
+        </div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">FC media</div>
+        <div class="home-metric-value">
+          {{ today_data.hr.avg if today_data.hr and today_data.hr.avg else '—' }}<span class="home-metric-unit">PPM</span>
+        </div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">HRV</div>
+        <div class="home-metric-value">
+          {{ "%.1f"|format(today_data.hrv.avg) if today_data.hrv and today_data.hrv.avg else '—' }}<span class="home-metric-unit">ms</span>
+        </div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Sueño</div>
+        <div class="home-metric-value">
+          {{ today_data.sleep.total_str if today_data.sleep and today_data.sleep.total_str else '—' }}
+        </div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Calorías</div>
+        <div class="home-metric-value">
+          {{ today_data.calories or '—' }}<span class="home-metric-unit">kcal</span>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <div style="text-align:center;padding:40px 0;color:var(--muted);font-family:var(--font-mono);font-size:12px">
+      Sin datos para hoy — importa tu exportación de Apple Health
+    </div>
+    {% endif %}
+
+    {# Accesos directos #}
+    <div class="home-shortcuts" style="margin-top:18px">
+      <a class="home-shortcut" href="/dashboard">
+        <span class="home-shortcut-icon">📊</span>Dashboard
+      </a>
+      <a class="home-shortcut" href="/historico">
+        <span class="home-shortcut-icon">📈</span>Histórico
+      </a>
+      <a class="home-shortcut" href="/workouts">
+        <span class="home-shortcut-icon">🏃</span>Entrenamientos
+      </a>
+      <a class="home-shortcut" href="/ecg">
+        <span class="home-shortcut-icon">💓</span>ECG
+      </a>
+    </div>
   </div>
 
-  <a class="card secondary" href="/dashboard">
-    <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
-    <div class="card-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-      </svg>
+  {# ── Panel de importación ─────────────────────────────────────────────────── #}
+  <div class="home-import-card">
+    <div class="home-import-title">Base de datos</div>
+
+    {% if stats %}
+    <div class="home-db-row">
+      <div class="home-db-card">
+        <div class="home-db-num">{{ stats.record_count|default('—') }}</div>
+        <div class="home-db-key">Registros</div>
+      </div>
+      <div class="home-db-card">
+        <div class="home-db-num">{{ stats.day_count|default('—') }}</div>
+        <div class="home-db-key">Días</div>
+      </div>
     </div>
-    <div class="card-title">Ver mis datos</div>
-    <div class="card-desc">{% if stats %}Explora métricas, tendencias y análisis de tu salud.{% else %}Disponible después de importar tu primer export.{% endif %}</div>
-  </a>
+    <div class="home-import-stats">
+      {% if stats.first_date %}
+      <div class="home-import-stat">
+        <span class="home-import-stat-key">Desde</span>
+        <span class="home-import-stat-val">{{ stats.first_date }}</span>
+      </div>
+      {% endif %}
+      {% if stats.last_date %}
+      <div class="home-import-stat">
+        <span class="home-import-stat-key">Hasta</span>
+        <span class="home-import-stat-val">{{ stats.last_date }}</span>
+      </div>
+      {% endif %}
+      {% if stats.last_import %}
+      <div class="home-import-stat">
+        <span class="home-import-stat-key">Importado</span>
+        <span class="home-import-stat-val">{{ stats.last_import[:10] }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="home-import-title" style="margin-top:4px">Actualizar datos</div>
+
+    <div class="home-drop" id="home-drop" onclick="document.getElementById('home-file').click()">
+      <div class="home-drop-icon">📦</div>
+      <div>Arrastra tu exportación de Apple Health</div>
+      <div style="margin-top:4px;font-size:11px">o pulsa para seleccionar el ZIP</div>
+      <input type="file" id="home-file" accept=".zip">
+    </div>
+
+    <div class="home-progress" id="home-progress">
+      <div class="home-progress-bar-track">
+        <div class="home-progress-bar-fill" id="home-progress-fill"></div>
+      </div>
+      <div class="home-progress-msg" id="home-progress-msg">Preparando…</div>
+    </div>
+  </div>
+
 </div>
-
-{# Zona de upload #}
-<div class="upload-zone" id="upload-zone">
-  <input type="file" id="file-input" accept=".zip">
-  <span class="upload-icon">📦</span>
-  <div class="upload-title">Arrastra tu export.zip aquí</div>
-  <div class="upload-hint">o haz clic para seleccionar · máx 500 MB</div>
-</div>
-
-{# Panel de progreso #}
-<div class="progress-wrap" id="progress-wrap">
-  <div class="phases" id="phases-bar">
-    {% for i in range(1, 6) %}
-      <div class="phase-dot" id="ph-{{ i }}">{{ i }}</div>
-      {% if i < 5 %}<div class="phase-line" id="pl-{{ i }}"></div>{% endif %}
-    {% endfor %}
-  </div>
-
-  <div class="progress-main">
-    <div class="progress-header">
-      <span id="progress-label">Subiendo archivo…</span>
-      <span id="progress-pct">—</span>
-    </div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" id="progress-fill"></div>
-    </div>
-    <div id="progress-msg"></div>
-  </div>
-
-  <div class="log-panel">
-    <div class="log-header">
-      <div class="log-dot" id="log-dot"></div>
-      <span class="log-title">log · importación en curso</span>
-    </div>
-    <div id="log-entries"></div>
-  </div>
-
-  <div class="summary-grid" id="summary-grid">
-    <div class="summary-item"><div class="summary-value" id="s-new">—</div><div class="summary-label">Registros nuevos</div></div>
-    <div class="summary-item"><div class="summary-value" id="s-total">—</div><div class="summary-label">Total en BD</div></div>
-    <div class="summary-item"><div class="summary-value" id="s-metrics">—</div><div class="summary-label">Métricas</div></div>
-    <div class="summary-item"><div class="summary-value" id="s-days">—</div><div class="summary-label">Días historial</div></div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+<script>
+// ── Fecha ─────────────────────────────────────────────────────────────────────
+const lbl = document.getElementById('home-date-label');
+if (lbl) {
+  const now = new Date();
+  const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  lbl.textContent = `${DIAS[now.getDay()]}, ${now.getDate()} de ${MESES_L[now.getMonth()]}`;
+}
+
+// ── Anillos ───────────────────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('home-rings');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 110, H = 110, cx = 55, cy = 55;
+  const RINGS = [
+    { r:46, color:'#ff3b5c', bg:'#3d0010', val:{{ today_data.calories or 0 }}, goal:500 },
+    { r:33, color:'#34c759', bg:'#0a3018', val:{{ today_data.ex_min or 0 }}, goal:30 },
+    { r:20, color:'#30b0c7', bg:'#003040', val:{{ today_data.stand or 0 }}, goal:12 },
+  ];
+  const SW = 10;
+
+  function draw(pcts) {
+    ctx.clearRect(0,0,W,H);
+    RINGS.forEach((ring, ri) => {
+      // Fondo
+      ctx.beginPath(); ctx.arc(cx,cy,ring.r,0,Math.PI*2);
+      ctx.strokeStyle=ring.bg; ctx.lineWidth=SW; ctx.stroke();
+      // Progreso
+      const pct = Math.min(pcts[ri], 1);
+      if (pct > 0) {
+        ctx.beginPath();
+        ctx.arc(cx,cy,ring.r,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
+        ctx.strokeStyle=ring.color; ctx.lineWidth=SW;
+        ctx.lineCap='round'; ctx.stroke();
+      }
+    });
+  }
+
+  // Animar
+  const targets = RINGS.map(r => Math.min(r.val/r.goal, 1.05));
+  const current = [0,0,0];
+  const start   = performance.now();
+  const DUR     = 1200;
+  function step(now) {
+    const t = Math.min((now-start)/DUR, 1);
+    const ease = 1 - Math.pow(1-t, 3);
+    current.forEach((_,i) => { current[i] = targets[i] * ease; });
+    draw(current);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
+
+// ── Importar ──────────────────────────────────────────────────────────────────
+const drop     = document.getElementById('home-drop');
+const fileInput = document.getElementById('home-file');
+const progress  = document.getElementById('home-progress');
+const fill      = document.getElementById('home-progress-fill');
+const msg       = document.getElementById('home-progress-msg');
+
+if (drop) {
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) startUpload(f);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) startUpload(fileInput.files[0]);
+  });
+}
+
+async function startUpload(file) {
+  drop.style.display    = 'none';
+  progress.style.display = 'block';
+  msg.textContent       = 'Subiendo…';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/upload', {method:'POST', body:fd});
+  if (!res.ok) { msg.textContent = 'Error al subir'; return; }
+
+  const es = new EventSource('/progress-stream');
+  es.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.pct !== undefined) fill.style.width = d.pct + '%';
+    if (d.msg)  msg.textContent = d.msg;
+    if (d.event === 'done')  { es.close(); setTimeout(()=>location.reload(), 1500); }
+    if (d.event === 'error') { es.close(); msg.textContent = 'Error: ' + (d.msg||'desconocido'); }
+  };
+}
+</script>
 {% endblock %}

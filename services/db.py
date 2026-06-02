@@ -34,8 +34,16 @@ SLEEP_INBED = {'HKCategoryValueSleepAnalysisInBed'}
 @contextmanager
 def get_conn():
     DATA_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=30)
     conn.row_factory = sqlite3.Row
+    # WAL mode: lecturas sin bloquear escrituras
+    conn.execute("PRAGMA journal_mode=WAL")
+    # Cache 64MB (default es 2MB — mejora queries complejas)
+    conn.execute("PRAGMA cache_size=-65536")
+    # Sync más rápido (seguro para datos de salud)
+    conn.execute("PRAGMA synchronous=NORMAL")
+    # Tablas temporales en RAM
+    conn.execute("PRAGMA temp_store=MEMORY")
     try:
         yield conn
     finally:
@@ -63,7 +71,55 @@ def init_db() -> None:
                 ON records (date_day);
             CREATE INDEX IF NOT EXISTS idx_type_day
                 ON records (type, date_day);
+            CREATE INDEX IF NOT EXISTS idx_type_day_val
+                ON records (type, date_day, value);
+            ANALYZE;
         """)
+        # Tabla de gamificación
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS streaks (
+                id       INTEGER PRIMARY KEY,
+                key      TEXT UNIQUE,   -- 'steps_7k', 'sleep_7h', etc.
+                current  INTEGER DEFAULT 0,
+                best     INTEGER DEFAULT 0,
+                last_date TEXT
+            );
+            CREATE TABLE IF NOT EXISTS achievements (
+                id         INTEGER PRIMARY KEY,
+                key        TEXT UNIQUE,
+                unlocked   INTEGER DEFAULT 0,
+                unlock_date TEXT,
+                value      REAL
+            );
+            CREATE TABLE IF NOT EXISTS user_goals (
+                key   TEXT PRIMARY KEY,
+                value REAL NOT NULL
+            );
+            INSERT OR IGNORE INTO user_goals (key,value) VALUES ('steps_daily', 10000);
+            INSERT OR IGNORE INTO user_goals (key,value) VALUES ('calories_daily', 500);
+            INSERT OR IGNORE INTO user_goals (key,value) VALUES ('exercise_min', 30);
+            INSERT OR IGNORE INTO user_goals (key,value) VALUES ('stand_hours', 12);
+            CREATE TABLE IF NOT EXISTS custom_achievements (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                emoji       TEXT    DEFAULT '🎯',
+                label       TEXT    NOT NULL,
+                desc        TEXT,
+                target_type TEXT,   -- 'steps','sleep_h','workout_km','manual'
+                target_val  REAL,
+                unlocked    INTEGER DEFAULT 0,
+                unlock_date TEXT,
+                created_at  TEXT    DEFAULT (date('now'))
+            );
+            CREATE TABLE IF NOT EXISTS challenges (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                month      TEXT,   -- 'YYYY-MM'
+                key        TEXT,
+                target     REAL,
+                unit       TEXT,
+                label      TEXT
+            );
+        """)
+
         # Migración: añadir value_str si no existe (BDs antiguas)
         cols = [r[1] for r in conn.execute("PRAGMA table_info(records)").fetchall()]
         if 'value_str' not in cols:
@@ -111,10 +167,45 @@ def _to_float(val) -> float | None:
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 def load_stats() -> dict | None:
-    if not STATS_FILE.exists():
+    """Carga stats con aliases normalizados para compatibilidad con templates."""
+    if not DB_FILE.exists():
         return None
-    with open(STATS_FILE) as f:
-        return json.load(f)
+    # Siempre reconstruir para tener datos frescos (rápido, usa índices)
+    try:
+        with get_conn() as conn:
+            total  = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+            n_days = conn.execute(
+                'SELECT COUNT(DISTINCT date_day) FROM records WHERE date_day != ""'
+            ).fetchone()[0]
+            dates  = conn.execute(
+                'SELECT MIN(date_day), MAX(date_day) FROM records WHERE date_day != ""'
+            ).fetchone()
+            n_src  = conn.execute(
+                'SELECT COUNT(DISTINCT source_name) FROM records'
+            ).fetchone()[0]
+        d_min, d_max = (dates[0] or ''), (dates[1] or '')
+        # Leer fecha de última importación del stats.json si existe
+        last_import = None
+        if STATS_FILE.exists():
+            try:
+                s = json.load(open(STATS_FILE))
+                last_import = s.get('last_import') or s.get('last_sync')
+            except Exception:
+                pass
+        return {
+            'record_count':  total,
+            'day_count':     n_days,
+            'first_date':    d_min,
+            'last_date':     d_max,
+            'last_import':   last_import,
+            'source_count':  n_src,
+            # aliases legacy
+            'total_records': total,
+            'date_min':      d_min,
+            'date_max':      d_max,
+        }
+    except Exception:
+        return None
 
 
 def save_stats(stats: dict) -> None:
@@ -149,6 +240,7 @@ def rebuild_stats() -> dict:
         'date_min':        d_min,
         'date_max':        d_max,
         'last_sync':       datetime.now().strftime('%d/%m/%y'),
+        'last_import':     datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'top_types':       [[r['type'], r['n']] for r in top],
     }
     save_stats(stats)
@@ -183,6 +275,167 @@ def _interval_minutes(start: str, end: str) -> float:
     if s and e:
         return (e - s).total_seconds() / 60
     return 0.0
+
+
+# ── Objetivos del usuario ────────────────────────────────────────────────────
+def get_user_goals() -> dict:
+    if not DB_FILE.exists():
+        return {'steps_daily': 10000, 'calories_daily': 500, 'exercise_min': 30, 'stand_hours': 12}
+    with get_conn() as conn:
+        rows = conn.execute("SELECT key, value FROM user_goals").fetchall()
+    return {r['key']: r['value'] for r in rows} if rows else {'steps_daily': 10000, 'calories_daily': 500, 'exercise_min': 30, 'stand_hours': 12}
+
+def save_user_goals(goals: dict):
+    with get_conn() as conn:
+        for k, v in goals.items():
+            conn.execute("INSERT OR REPLACE INTO user_goals (key,value) VALUES (?,?)", (k, v))
+        conn.commit()
+
+# ── BATCH: todas las métricas del día en UNA conexión ────────────────────────
+def get_day_data_batch(date_str: str) -> dict:
+    """
+    Reemplaza 9 llamadas individuales con una sola conexión SQLite.
+    Recoge todos los registros del día en una query y los procesa en Python.
+    """
+    if not DB_FILE.exists():
+        return {}
+
+    # Tipos que necesitamos del día
+    TYPES_NEEDED = (
+        'HKQuantityTypeIdentifierStepCount',
+        'HKQuantityTypeIdentifierDistanceWalkingRunning',
+        'HKQuantityTypeIdentifierActiveEnergyBurned',
+        'HKQuantityTypeIdentifierBasalEnergyBurned',
+        'HKQuantityTypeIdentifierHeartRate',
+        'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
+        'HKQuantityTypeIdentifierRestingHeartRate',
+        'HKQuantityTypeIdentifierAppleExerciseTime',
+        'HKQuantityTypeIdentifierAppleStandHour',
+        'HKQuantityTypeIdentifierAppleStandTime',
+        'HKQuantityTypeIdentifierFlightsClimbed',
+        'HKQuantityTypeIdentifierVO2Max',
+        'HKQuantityTypeIdentifierOxygenSaturation',
+        'HKQuantityTypeIdentifierRespiratoryRate',
+        'HKQuantityTypeIdentifierWalkingStepLength',
+        'HKQuantityTypeIdentifierWalkingSpeed',
+        'HKQuantityTypeIdentifierBodyMass',
+        'HKCategoryTypeIdentifierSleepAnalysis',
+    )
+    ph = ','.join('?' * len(TYPES_NEEDED))
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT type, value, value_str, unit, source_name, "
+            f"start_date, end_date "
+            f"FROM records WHERE type IN ({ph}) AND date_day=? "
+            f"ORDER BY start_date",
+            (*TYPES_NEEDED, date_str)
+        ).fetchall()
+
+    # Agrupar por tipo
+    by_type: dict = {}
+    for r in rows:
+        t = r['type']
+        if t not in by_type:
+            by_type[t] = []
+        by_type[t].append(r)
+
+    result = {}
+
+    # ── Pasos (priorizar Apple Watch sobre iPhone) ────────────────────────────
+    step_rows = by_type.get('HKQuantityTypeIdentifierStepCount', [])
+    if step_rows:
+        by_src: dict = {}
+        for r in step_rows:
+            src = (r['source_name'] or 'unknown').strip()
+            by_src[src] = by_src.get(src, 0.0) + (r['value'] or 0.0)
+        def _prio(s):
+            sl = s.lower()
+            return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
+        result['steps'] = int(by_src[min(by_src, key=_prio)])
+    else:
+        result['steps'] = 0
+
+    # ── Distancia ─────────────────────────────────────────────────────────────
+    dist_rows = by_type.get('HKQuantityTypeIdentifierDistanceWalkingRunning', [])
+    total_dist = 0.0
+    for r in dist_rows:
+        v = r['value'] or 0.0
+        u = (r['unit'] or '').lower()
+        total_dist += v if u in ('km','kilometer','kilometers') else v / 1000.0
+    result['distance_km'] = round(total_dist, 2)
+
+    # ── Calorías activas ──────────────────────────────────────────────────────
+    cal_rows = by_type.get('HKQuantityTypeIdentifierActiveEnergyBurned', [])
+    result['calories'] = int(sum(r['value'] or 0 for r in cal_rows))
+
+    # ── Serie horaria calorías ────────────────────────────────────────────────
+    hourly_cal: dict = {}
+    for r in cal_rows:
+        try:
+            h = int(r['start_date'][11:13])
+            hourly_cal[h] = hourly_cal.get(h, 0.0) + (r['value'] or 0.0)
+        except Exception:
+            pass
+    result['cal_series'] = [{'h': h, 'v': round(v, 1)} for h, v in sorted(hourly_cal.items())]
+
+    # ── Frecuencia cardíaca ───────────────────────────────────────────────────
+    hr_rows = by_type.get('HKQuantityTypeIdentifierHeartRate', [])
+    if hr_rows:
+        vals = [r['value'] for r in hr_rows if r['value']]
+        if vals:
+            result['hr'] = {
+                'avg': round(sum(vals)/len(vals), 1),
+                'min': round(min(vals), 1),
+                'max': round(max(vals), 1),
+                'raw': [{'t': r['start_date'][11:16], 'v': r['value']} for r in hr_rows if r['value']],
+            }
+        else:
+            result['hr'] = {}
+    else:
+        result['hr'] = {}
+
+    # ── HRV ──────────────────────────────────────────────────────────────────
+    hrv_rows = by_type.get('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', [])
+    if hrv_rows:
+        vals = [r['value'] for r in hrv_rows if r['value']]
+        result['hrv'] = {'avg': round(sum(vals)/len(vals), 1)} if vals else {}
+    else:
+        result['hrv'] = {}
+
+    # ── FC reposo ─────────────────────────────────────────────────────────────
+    fc_rest = by_type.get('HKQuantityTypeIdentifierRestingHeartRate', [])
+    result['hr_reposo'] = round(fc_rest[-1]['value'], 1) if fc_rest and fc_rest[-1]['value'] else None
+
+    # ── Ejercicio ─────────────────────────────────────────────────────────────
+    ex_rows = by_type.get('HKQuantityTypeIdentifierAppleExerciseTime', [])
+    result['ex_min'] = int(sum(r['value'] or 0 for r in ex_rows))
+
+    # ── De pie ────────────────────────────────────────────────────────────────
+    stand_rows = by_type.get('HKQuantityTypeIdentifierAppleStandHour', [])
+    result['stand_h'] = len([r for r in stand_rows if (r['value_str'] or '').endswith('Stood')])
+
+    # ── Pisos ─────────────────────────────────────────────────────────────────
+    pisos_rows = by_type.get('HKQuantityTypeIdentifierFlightsClimbed', [])
+    result['pisos'] = int(sum(r['value'] or 0 for r in pisos_rows))
+
+    # ── VO2 max ───────────────────────────────────────────────────────────────
+    vo2_rows = by_type.get('HKQuantityTypeIdentifierVO2Max', [])
+    result['vo2'] = round(vo2_rows[-1]['value'], 1) if vo2_rows and vo2_rows[-1]['value'] else None
+
+    # ── SpO2 ──────────────────────────────────────────────────────────────────
+    spo2_rows = by_type.get('HKQuantityTypeIdentifierOxygenSaturation', [])
+    if spo2_rows:
+        vals = [r['value']*100 for r in spo2_rows if r['value']]
+        result['spo2'] = round(sum(vals)/len(vals), 1) if vals else None
+    else:
+        result['spo2'] = None
+
+    # ── Sueño ─────────────────────────────────────────────────────────────────
+    # (sueño complejo — delegar a get_sleep_day que ya está optimizado)
+    result['_needs_sleep'] = True
+
+    return result
 
 
 # ── Pasos (deduplicado por fuente) ────────────────────────────────────────────
@@ -462,7 +715,16 @@ def get_available_dates() -> dict:
         row = conn.execute(
             'SELECT MIN(date_day), MAX(date_day) FROM records WHERE date_day!=""'
         ).fetchone()
-    return {'date_min': row[0] or '', 'date_max': row[1] or ''}
+        # Último día con pasos reales
+        last_steps = conn.execute(
+            "SELECT MAX(date_day) FROM records "
+            "WHERE type='HKQuantityTypeIdentifierStepCount' AND value>100 AND date_day!=''"
+        ).fetchone()
+    return {
+        'date_min': row[0] or '',
+        'date_max': row[1] or '',
+        'last_with_steps': (last_steps[0] if last_steps else None) or row[1] or '',
+    }
 
 
 # ── Debug ─────────────────────────────────────────────────────────────────────

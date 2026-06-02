@@ -8,7 +8,7 @@
 }
 .dash-title-block { flex: 1; min-width: 0; }
 .dash-title  { font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); line-height: 1.1; }
-.dash-subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.dash-subtitle { font-size: 15px; color: var(--text); margin-top: 4px; font-weight: 400; letter-spacing: -.01em; }
 
 .dash-grid {
   display: grid;
@@ -501,7 +501,7 @@
 .ds-top {
   display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px;
+  border-radius: 14px; padding: 16px; position: relative;
 }
 
 /* Anillos compactos */
@@ -721,3 +721,67 @@
   color: var(--muted); transition: all .15s;
 }
 .pdf-export-btn:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Fecha prominente ────────────────────────────────────────────────────────── */
+.dash-day-badge { display: none; } /* ya no se usa */
+
+/* ── Toggle extra panel ──────────────────────────────────────────────────────── */
+.extra-panel-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; cursor: pointer; margin: 14px 0 0;
+  font-size: 13px; font-weight: 600; color: var(--text);
+  transition: border-color .15s;
+}
+.extra-panel-toggle:hover { border-color: var(--border-2); }
+.extra-panel-toggle .extra-chevron { width:18px; height:18px; stroke:var(--muted); flex-shrink:0; }
+
+/* ── Espaciado entre tarjetas en /salud ────────────────────────────────────── */
+#salud-panel .es-metric-grid {
+  padding: 12px 16px 16px;
+  gap: 10px;
+}
+#salud-panel .es-metric-card {
+  border-radius: 12px;
+}
+#salud-panel .extra-section {
+  margin-bottom: 12px;
+}
+
+.extra-panel-toggle { text-decoration: none; }
+
+/* ── Calendario heatmap ──────────────────────────────────────────────────────── */
+.cal-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  margin: 2px auto 0; flex-shrink: 0;
+}
+.cal-cell { display: flex; flex-direction: column; align-items: center; }
+
+/* Zonas FC en detalle de entrenamiento */
+.fc-zones-wrap { margin-top: 14px; }
+.fc-zone-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 7px;
+}
+.fc-zone-label { font-size: 11px; font-family: var(--font-mono); width: 60px; color: var(--muted); }
+.fc-zone-bar-track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.fc-zone-bar-fill  { height: 100%; border-radius: 4px; transition: width 1s ease; }
+.fc-zone-pct   { font-size: 11px; font-family: var(--font-mono); width: 36px; text-align: right; font-weight: 600; }
+.fc-zone-time  { font-size: 10px; font-family: var(--font-mono); color: var(--dim); width: 44px; }
+
+/* ── Skeleton loading ────────────────────────────────────────────────────────── */
+@keyframes skeleton-pulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+.skeleton {
+  background: var(--border);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  display: inline-block;
+  min-width: 40px;
+  min-height: 1em;
+}
+/* Evitar que el skeleton rompa el layout */
+.ds-mc-value .skeleton { min-width: 60px; height: 2rem; vertical-align: middle; }

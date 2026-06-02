@@ -15,10 +15,32 @@ from services.importer import import_state, process_zip, progress_queue
 main_bp = Blueprint('main', __name__)
 
 
+@main_bp.route('/sw.js')
+def service_worker():
+    from flask import send_from_directory, current_app
+    import os
+    static_dir = os.path.join(current_app.root_path, 'static')
+    resp = send_from_directory(static_dir, 'sw.js',
+                               mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
 @main_bp.route('/')
 def index():
-    stats = load_stats()
-    return render_template('index.html', stats=stats)
+    from flask import redirect
+    from services.db import DB_FILE, get_available_dates
+    if not DB_FILE.exists():
+        return redirect('/ajustes')
+    # Comprobar si hay datos
+    try:
+        dates = get_available_dates()
+        if not dates:
+            return redirect('/ajustes')
+    except Exception:
+        return redirect('/ajustes')
+    return redirect('/dashboard')
 
 
 @main_bp.route('/upload', methods=['POST'])
@@ -57,6 +79,13 @@ def progress_stream():
                 payload = json.dumps({'event': item['event'], **item['data']})
                 yield f'data: {payload}\n\n'
                 if item['event'] in ('done', 'error'):
+                    try:
+                        from routes.dashboard import invalidate_cache
+                        from routes.history import invalidate_hist_cache
+                        invalidate_cache()
+                        invalidate_hist_cache()
+                    except Exception:
+                        pass
                     break
             except queue.Empty:
                 yield ': heartbeat\n\n'

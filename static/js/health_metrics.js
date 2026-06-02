@@ -1,0 +1,732 @@
+/**
+ * health_metrics.js — Funciones compartidas entre dashboard y salud
+ * Requiere: gTooltip, _canvasHover, showTooltip, hideTooltipForce,
+ *           drawLineChart, setM, setTxt, _pendingCharts, registerChart,
+ *           currentDate definidos en la página que lo carga
+ */
+// ── Gráfica de fases de sueño estilo Apple ───────────────────────────────────
+function drawSleepPhases(segments) {
+  const wrap    = document.getElementById('sleep-apple-wrap');
+  const noData  = document.getElementById('sleep-no-data');
+  const canvas  = document.getElementById('sleep-phases-canvas');
+  if (!canvas) return;
+
+  if (!segments || !segments.length) {
+    if (wrap)   wrap.style.display   = 'none';
+    if (noData) noData.style.display = 'block';
+    return;
+  }
+  if (wrap)   wrap.style.display   = 'block';
+  if (noData) noData.style.display = 'none';
+
+  // Detectar si hay fases o solo datos sin especificar
+  const hasPhases = segments.some(s => s.phase === 'deep' || s.phase === 'rem');
+  const PHASES = hasPhases
+    ? { awake: 0, rem: 1, light: 2, deep: 3 }
+    : { awake: 0, light: 1 };  // sin fases: solo Despierto / Dormido
+  const COLORS = {
+    awake: '#ff6b6b',
+    rem:   '#63c3f5',
+    light: '#3a7bd5',
+    deep:  '#1a3fa8',
+  };
+  const ROWS = hasPhases ? 4 : 2;
+
+  // Calcular rango de tiempo
+  const parseT = s => new Date(s.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) \+(\d{2})(\d{2})$/, '$1T$2+$3:$4')).getTime();
+  const times  = segments.flatMap(s => [parseT(s.start), parseT(s.end)]);
+  const tMin   = Math.min(...times), tMax = Math.max(...times);
+  const tRange = tMax - tMin || 1;
+
+  // Canvas
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = hasPhases ? 140 : 80;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const W = canvas.width, H = canvas.height;
+  const rowH   = H / ROWS;
+  const padX   = 0;
+
+  // Fondo de filas alternadas
+  for (let r = 0; r < ROWS; r++) {
+    ctx.fillStyle = r % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.01)';
+    ctx.fillRect(0, r * rowH, W, rowH);
+  }
+
+  // Líneas de separación
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+  for (let r = 1; r < ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r*rowH); ctx.lineTo(W, r*rowH); ctx.stroke();
+  }
+
+  // Segmentos
+  segments.forEach(seg => {
+    const rowIdx = PHASES[seg.phase];
+    if (rowIdx === undefined) return;
+    const t0 = parseT(seg.start), t1 = parseT(seg.end);
+    const x0 = ((t0 - tMin) / tRange) * W;
+    const x1 = ((t1 - tMin) / tRange) * W;
+    const bw  = Math.max(x1 - x0, 2);
+    const y   = rowIdx * rowH + rowH * 0.15;
+    const bh  = rowH * 0.70;
+    const rx  = Math.min(4, bw / 2);
+
+    ctx.fillStyle = COLORS[seg.phase] || '#888';
+    ctx.beginPath();
+    ctx.roundRect(x0, y, bw, bh, rx);
+    ctx.fill();
+  });
+
+  // Actualizar etiquetas del eje Y según si hay fases
+  const labelsEl = document.getElementById('sleep-apple-labels');
+  if (labelsEl) {
+    labelsEl.innerHTML = hasPhases
+      ? '<div>Vigilia</div><div>REM</div><div>Ligero</div><div>Profundo</div>'
+      : '<div>Despierto</div><div>Dormido</div>';
+  }
+
+  // Eje X: horas — máximo 8 marcas
+  const xAxis = document.getElementById('sleep-x-axis');
+  if (xAxis) {
+    const durationH = tRange / 3600000;
+    const stepH = durationH <= 4 ? 1 : durationH <= 8 ? 1 : 2; // paso en horas
+    const labels = [];
+    let cur = new Date(tMin);
+    cur.setMinutes(0, 0, 0);
+    if (cur.getTime() < tMin) cur.setHours(cur.getHours() + 1);
+    while (cur.getTime() <= tMax) {
+      const pct = ((cur.getTime() - tMin) / tRange * 100).toFixed(1);
+      const hstr = cur.getHours().toString().padStart(2,'0') + ':00';
+      labels.push(`<span style="position:absolute;left:${pct}%;transform:translateX(-50%)">${hstr}</span>`);
+      cur = new Date(cur.getTime() + stepH * 3600000);
+    }
+    xAxis.style.position = 'relative';
+    xAxis.style.height   = '18px';
+    xAxis.innerHTML      = labels.join('');
+  }
+
+  // Totales por fase
+  const totals = {awake:0, rem:0, light:0, deep:0};
+  segments.forEach(s => { if (totals[s.phase] !== undefined) totals[s.phase] += s.mins; });
+  const fmt = m => m < 60 ? Math.round(m)+' m' : Math.floor(m/60)+' h '+(Math.round(m%60)+' m');
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('sp-awake', totals.awake > 0 ? fmt(totals.awake) : '—');
+  setEl('sp-rem',   totals.rem   > 0 ? fmt(totals.rem)   : '—');
+  setEl('sp-light', totals.light > 0 ? fmt(totals.light) : '—');
+  setEl('sp-deep',  totals.deep  > 0 ? fmt(totals.deep)  : '—');
+
+  // Tooltip al hover
+  const tip = document.getElementById('sleep-hover-tip');
+  canvas.onmousemove = e => {
+    const rect  = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx    = (e.clientX - rect.left) * scaleX;
+    const my    = (e.clientY - rect.top);
+    const rowI  = Math.floor(my / (rect.height / ROWS));
+    const phaseName = Object.keys(PHASES).find(k => PHASES[k] === rowI) || '';
+    const t     = tMin + (mx / canvas.width) * tRange;
+    const date  = new Date(t);
+    const hStr  = date.getHours().toString().padStart(2,'0') + ':' + date.getMinutes().toString().padStart(2,'0');
+    // Buscar segmento bajo el cursor
+    const seg   = segments.find(s => parseT(s.start) <= t && parseT(s.end) >= t && s.phase === phaseName);
+    if (seg) {
+      const PHASE_LABELS = {awake:'Vigilia', rem:'REM', light:'Ligero', deep:'Profundo'};
+      tip.innerHTML = `<b>${PHASE_LABELS[seg.phase]}</b> · ${fmt(seg.mins)}<br>${hStr}`;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX - rect.left) + 'px';
+      tip.style.top  = (e.clientY - rect.top - 44) + 'px';
+    } else {
+      tip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { if(tip) tip.style.display = 'none'; };
+
+  // Guardar para redibujar al redimensionar
+  canvas._sleepSegments = segments;
+}
+
+window.addEventListener('resize', () => {
+  const c = document.getElementById('sleep-phases-canvas');
+  if (c && c._sleepSegments) drawSleepPhases(c._sleepSegments);
+})
+
+// ── Gráfica de línea para sección (FC del día / pasos por hora) ──────────────
+function drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color, fillColor, labelFn, subText) {
+  const canvas = document.getElementById(canvasId);
+  const tip    = document.getElementById(tipId);
+  const xaxis  = document.getElementById(xaxisId);
+  const sub    = document.getElementById(subId);
+  if (!canvas || !dataPoints || !dataPoints.length) return;
+
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = 90;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const vals = dataPoints.map(d => d.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const padX = 0, padY = 8;
+
+  const pts = dataPoints.map((d, i) => ({
+    x: (i / (dataPoints.length-1)) * (W - padX*2) + padX,
+    y: H - padY - ((d.v - minV) / range) * (H - padY*2),
+    d,
+  }));
+
+  // Fill
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, fillColor); grad.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.moveTo(pts[0].x, H); ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i=1;i<pts.length;i++) {
+    const p0=pts[i-1], p1=pts[i], pm=pts[Math.max(i-2,0)], p2=pts[Math.min(i+1,pts.length-1)];
+    const t=0.25;
+    ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t, p0.y+(p1.y-pm.y)*t,
+                      p1.x-(p2.x-p0.x)*t, p1.y-(p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Línea
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i=1;i<pts.length;i++) {
+    const p0=pts[i-1], p1=pts[i], pm=pts[Math.max(i-2,0)], p2=pts[Math.min(i+1,pts.length-1)];
+    const t=0.25;
+    ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t, p0.y+(p1.y-pm.y)*t,
+                      p1.x-(p2.x-p0.x)*t, p1.y-(p2.y-p0.y)*t, p1.x, p1.y);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+
+  if (sub && subText) sub.textContent = subText;
+
+  // Eje X
+  if (xaxis) {
+    const step = Math.max(1, Math.floor(dataPoints.length / 8));
+    const labels = [];
+    dataPoints.forEach((d, i) => {
+      if (i % step === 0 || i === dataPoints.length-1) {
+        const pct = (pts[i].x / W * 100).toFixed(1);
+        labels.push(`<span style="left:${pct}%">${d.label || d.t || d.h+':00'}</span>`);
+      }
+    });
+    xaxis.innerHTML = labels.join('');
+  }
+
+  // Hover
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    let best=0, bestD=Infinity;
+    pts.forEach((p,i)=>{ const d=Math.abs(p.x-mx); if(d<bestD){bestD=d;best=i;}});
+    const hp = pts[best];
+    // Punto
+    ctx.clearRect(0,0,W,H);
+    // Redibujar base rápido
+    const grad2 = ctx.createLinearGradient(0,0,0,H);
+    grad2.addColorStop(0,fillColor); grad2.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(pts[0].x,H); ctx.lineTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();ctx.fillStyle=grad2;ctx.fill();
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+    // Dot
+    ctx.beginPath();ctx.arc(hp.x,hp.y,5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+    ctx.beginPath();ctx.arc(hp.x,hp.y,8,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.globalAlpha=.25;ctx.stroke();ctx.globalAlpha=1;
+    // Tooltip
+    if (tip) {
+      tip.innerHTML = labelFn(pts[best].d);
+      tip.style.display='block';
+      tip.style.left = (e.clientX-rect.left)+'px';
+      tip.style.top  = (hp.y/H*rect.height-8)+'px';
+    }
+  };
+  canvas.onmouseleave = () => {
+    if(tip) tip.style.display='none';
+    ctx.clearRect(0,0,W,H);
+    // Redibujar sin hover
+    const grad3=ctx.createLinearGradient(0,0,0,H);grad3.addColorStop(0,fillColor);grad3.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath();ctx.moveTo(pts[0].x,H);ctx.lineTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.lineTo(pts[pts.length-1].x,H);ctx.closePath();ctx.fillStyle=grad3;ctx.fill();
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],pm=pts[Math.max(i-2,0)],p2=pts[Math.min(i+1,pts.length-1)],t=.25;ctx.bezierCurveTo(p0.x+(p1.x-pm.x)*t,p0.y+(p1.y-pm.y)*t,p1.x-(p2.x-p0.x)*t,p1.y-(p2.y-p0.y)*t,p1.x,p1.y);}
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+  };
+
+  // Guardar para resize
+  canvas._redrawSection = () => drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color, fillColor, labelFn, subText);
+}
+
+
+// ── Gráfica de barras para pasos por hora ─────────────────────────────────────
+function drawStepsBarChart(canvasId, tipId, xaxisId, subId, data, subText) {
+  const canvas = document.getElementById(canvasId);
+  const tip    = document.getElementById(tipId);
+  const xaxis  = document.getElementById(xaxisId);
+  const sub    = document.getElementById(subId);
+  if (!canvas || !data || !data.length) return;
+
+  canvas.width  = canvas.parentElement.offsetWidth || 600;
+  canvas.height = 90;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const maxV  = Math.max(...data.map(d => d.v)) || 1;
+  const n     = data.length;
+  const barW  = Math.max(2, (W / n) - 2);
+  const padY  = 6;
+
+  data.forEach((d, i) => {
+    const x   = (i / n) * W + 1;
+    const bh  = Math.max(2, ((d.v / maxV) * (H - padY - 4)));
+    const y   = H - padY - bh;
+    const alpha = d.v === 0 ? 0.1 : 0.75;
+    ctx.fillStyle = `rgba(255,149,0,${alpha})`;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, barW, bh, 3);
+    else ctx.rect(x, y, barW, bh);
+    ctx.fill();
+  });
+
+  if (sub && subText) sub.textContent = subText;
+
+  // Eje X: horas
+  if (xaxis) {
+    const step = Math.max(1, Math.floor(n / 8));
+    const labels = data.map((d, i) => {
+      if (i % step !== 0 && i !== n-1) return '';
+      const x = ((i + 0.5) / n * 100).toFixed(1);
+      return `<span style="left:${x}%">${d.h}:00</span>`;
+    }).join('');
+    xaxis.innerHTML = labels;
+  }
+
+  // Hover
+  canvas.onmousemove = e => {
+    const rect  = canvas.getBoundingClientRect();
+    const mx    = (e.clientX - rect.left) / rect.width * W;
+    const idx   = Math.min(n-1, Math.max(0, Math.floor(mx / (W/n))));
+    const d     = data[idx];
+    if (tip) {
+      tip.innerHTML = `<b>${d.h}:00</b><br>${Math.round(d.v).toLocaleString('es-ES')} pasos`;
+      const px = ((idx+0.5)/n * rect.width);
+      tip.style.display = 'block';
+      tip.style.left    = px + 'px';
+      tip.style.top     = '0px';
+    }
+    // Resaltar barra
+    ctx.clearRect(0,0,W,H);
+    data.forEach((dd, i) => {
+      const x  = (i/n)*W+1;
+      const bh = Math.max(2,((dd.v/maxV)*(H-padY-4)));
+      const y  = H-padY-bh;
+      ctx.fillStyle = i===idx ? 'rgba(255,149,0,1)' : `rgba(255,149,0,${dd.v===0?0.1:0.75})`;
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(x,y,barW,bh,3); else ctx.rect(x,y,barW,bh);
+      ctx.fill();
+    });
+  };
+  canvas.onmouseleave = () => {
+    if (tip) tip.style.display = 'none';
+    ctx.clearRect(0,0,W,H);
+    data.forEach((d,i)=>{
+      const x=(i/n)*W+1, bh=Math.max(2,((d.v/maxV)*(H-padY-4))), y=H-padY-bh;
+      ctx.fillStyle=`rgba(255,149,0,${d.v===0?0.1:0.75})`;
+      ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,barW,bh,3);else ctx.rect(x,y,barW,bh);ctx.fill();
+    });
+  };
+
+  canvas._redrawSection = () => drawStepsBarChart(canvasId, tipId, xaxisId, subId, data, subText);
+}
+
+// ── Exportar PDF del día ─────────────────────────────────────────────────────
+async function exportDayPDF() {
+  const btn = document.querySelector('.pdf-export-btn');
+  if (btn) { btn.textContent = 'Generando…'; btn.disabled = true; }
+
+  // Cargar jsPDF
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW = 190, ML = 10;
+  let y = 0;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getEl   = id => document.getElementById(id)?.textContent?.trim() || '—';
+  const newPage = () => { pdf.addPage(); y = 16; };
+  const checkY  = (need = 10) => { if (y + need > 278) newPage(); };
+
+  const header = (title, sub = '') => {
+    checkY(14);
+    pdf.setFillColor(30, 30, 30);
+    pdf.rect(ML, y, PW, 8, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(title.toUpperCase(), ML + 3, y + 5.5);
+    if (sub) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(180, 180, 180);
+      pdf.text(sub, ML + 3 + pdf.getTextWidth(title.toUpperCase()) + 4, y + 5.5);
+    }
+    y += 11;
+  };
+
+  const metaGrid = (items) => {
+    // Muestra items en grid de 3 columnas
+    const colW = PW / 3;
+    let col = 0;
+    items.forEach(([label, val, unit='']) => {
+      if (!val || val === '—') return;
+      const x = ML + col * colW;
+      checkY(14);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(label, x, y);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text(`${val}${unit ? ' '+unit : ''}`, x, y + 5.5);
+      col++;
+      if (col === 3) { col = 0; y += 14; }
+    });
+    if (col > 0) y += 14;
+    y += 2;
+  };
+
+  const addCanvas = (canvasId, label, maxH = 45) => {
+    const c = document.getElementById(canvasId);
+    if (!c || c.width === 0 || c.height === 0) return;
+    try {
+      const img = c.toDataURL('image/png');
+      const aspect = c.height / c.width;
+      const imgW = PW, imgH = Math.min(maxH, PW * aspect);
+      checkY(imgH + 8);
+      if (label) {
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
+        pdf.setTextColor(100,100,100);
+        pdf.text(label, ML, y); y += 4;
+      }
+      pdf.addImage(img, 'PNG', ML, y, imgW, imgH);
+      y += imgH + 5;
+    } catch(e) { console.warn('canvas export:', canvasId, e); }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PÁGINA 1 — Cabecera + Actividad + Corazón + Sueño
+  // ═══════════════════════════════════════════════════════════════════════════
+  pdf.setFillColor(17, 17, 17);
+  pdf.rect(0, 0, 210, 20, 'F');
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text('Resumen de Salud', ML, 9);
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+  pdf.setTextColor(180, 180, 180);
+  pdf.text(document.getElementById('dash-date-label')?.textContent || currentDate, ML, 15);
+
+  // Anillos — capturar el canvas
+  const ringsC = document.getElementById('rings-canvas');
+  if (ringsC) {
+    try {
+      const ri = ringsC.toDataURL('image/png');
+      pdf.addImage(ri, 'PNG', 210 - 36, 1, 34, 34);
+    } catch(e) {}
+  }
+  y = 26;
+
+  // Actividad
+  header('Actividad');
+  metaGrid([
+    ['Pasos',              getEl('steps-num')],
+    ['Distancia',          getEl('m-distancia'), 'km'],
+    ['Calorías activas',   getEl('m-cal-activas'), 'kcal'],
+    ['Movimiento',         getEl('act-move')],
+    ['Ejercicio',          getEl('act-ex')],
+    ['De pie',             getEl('act-stand')],
+    ['Cal. en reposo',     getEl('m-cal-basales'), 'kcal'],
+    ['Pisos subidos',      getEl('m-pisos')],
+    ['Esfuerzo',           getEl('m-esfuerzo'), '/10'],
+  ]);
+
+  // Gráfica de pasos por hora
+  addCanvas('steps-hour-canvas', 'Pasos por hora', 35);
+
+  // Corazón
+  header('Corazón');
+  metaGrid([
+    ['FC media',           getEl('m-fc'), 'PPM'],
+    ['FC reposo',          getEl('m-fc-reposo'), 'PPM'],
+    ['HRV',                getEl('m-hrv'), 'ms'],
+    ['Rec. cardíaca',      getEl('m-fc-recov'), 'PPM'],
+    ['FC al caminar',      getEl('m-fc-caminar'), 'PPM'],
+    ['SpO₂',               getEl('m-spo2'), '%'],
+  ]);
+
+  // Gráfica de FC del día
+  addCanvas('hr-day-canvas', 'FC a lo largo del día', 35);
+
+  // Sueño
+  header('Sueño');
+  metaGrid([
+    ['Total',              getEl('sleep-total')],
+    ['Profundo',           getEl('m-sleep-deep')],
+    ['REM',                getEl('m-sleep-rem')],
+    ['Temp. muñeca',       getEl('m-temp-muneca'), '°C'],
+  ]);
+  addCanvas('sleep-phases-canvas', 'Fases de sueño', 40);
+
+  // Recuperación
+  const recScore = getEl('rec-score-top');
+  if (recScore !== '—') {
+    header('Recuperación estimada');
+    metaGrid([
+      ['Puntuación',  recScore, '/ 100'],
+      ['Estado',      getEl('rec-label-top')],
+    ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PÁGINA 2 — Entrenamientos + ECG + Marcha
+  // ═══════════════════════════════════════════════════════════════════════════
+  newPage();
+
+  // Entrenamientos del día
+  const wkList = document.getElementById('workouts-list');
+  const hasWk  = wkList && !wkList.querySelector('.workout-empty');
+  header('Entrenamientos', hasWk ? '' : 'Sin entrenamientos este día');
+  if (hasWk) {
+    wkList.querySelectorAll('a.workout-row-link, div.workout-row-link').forEach(w => {
+      checkY(10);
+      const name = w.querySelector('.workout-name')?.textContent?.trim() || '';
+      const meta = w.querySelector('.workout-meta')?.textContent?.trim() || '';
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(20,20,20);
+      pdf.text(`${name}`, ML, y);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(100,100,100);
+      pdf.text(meta, ML + 50, y);
+      y += 7;
+    });
+  }
+  y += 4;
+
+  // ECG si hay datos ese día
+  const ecgRow = document.getElementById('ecg-day-row');
+  const ecgCount = document.getElementById('m-ecg-count')?.textContent?.trim();
+  if (ecgRow && ecgRow.style.display !== 'none' && ecgCount !== '—') {
+    header('ECG', `${ecgCount} registro(s)`);
+    // Capturar el canvas del modal ECG si está abierto
+    const ecgCanvas = document.getElementById('de-canvas');
+    if (ecgCanvas && ecgCanvas.width > 0) {
+      addCanvas('de-canvas', 'Electrocardiograma', 50);
+    } else {
+      pdf.setFont('helvetica', 'italic'); pdf.setFontSize(9); pdf.setTextColor(120,120,120);
+      pdf.text('Abre el ECG en el dashboard para incluir la gráfica en el PDF.', ML, y);
+      y += 8;
+    }
+    y += 4;
+  }
+
+  // Marcha y movilidad
+  const vel = getEl('m-velocidad');
+  header('Marcha y movilidad');
+  metaGrid([
+    ['Velocidad marcha',   vel !== '—' ? vel : '—', 'km/h'],
+    ['Longitud del paso',  getEl('m-zancada'), 'cm'],
+    ['Estabilidad',        getEl('m-estabilidad'), '%'],
+    ['Doble apoyo',        getEl('m-doble-apoyo'), '%'],
+    ['Asimetría',          getEl('m-asimetria'), '%'],
+    ['Marcha 6 min',       getEl('m-test6min'), 'm'],
+  ]);
+
+  // Respiración + Cuerpo + Nutrición
+  header('Más métricas');
+  metaGrid([
+    ['Frec. respiratoria', getEl('m-resp'), 'rpm'],
+    ['Peso',               getEl('m-peso'), 'kg'],
+    ['IMC',                getEl('m-imc'), 'kg/m²'],
+    ['Agua',               getEl('m-agua'), 'mL'],
+    ['Luz diurna',         getEl('m-luz'), 'min'],
+    ['Lavado manos',       getEl('m-lavado-manos'), 'veces'],
+  ]);
+
+  // ── Pie de página ─────────────────────────────────────────────────────────
+  const pages = pdf.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    pdf.setPage(i);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
+    pdf.setTextColor(160, 160, 160);
+    pdf.line(ML, 283, ML + PW, 283);
+    pdf.text(`Health Dashboard · ${currentDate} · Pág. ${i}/${pages}`, ML, 288);
+  }
+
+  pdf.save(`salud_${currentDate}.pdf`);
+  if (btn) { btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> PDF'; btn.disabled = false; }
+}
+
+
+function updateAllMetrics(am) {
+  if (!am) return;
+  // Limpiar gráficas pendientes anteriores
+  Object.keys(_pendingCharts).forEach(k => { _pendingCharts[k] = []; });
+
+  const a  = am.actividad   || {};
+  const nu = am.nutricion   || {};
+  const c = am.corazon      || {};
+  const r = am.respiracion  || {};
+  const m = am.marcha       || {};
+  const b = am.cuerpo       || {};
+  const s = am.sueno        || {};   // {total_str, deep_min, rem_min, light_min}
+  const au= am.audio        || {};
+  const o = am.otros        || {};
+  const t = am.temp_muneca  || {};
+
+  // ── Actividad
+  setM('pasos',           a.pasos,         0);
+  setM('cal-activas',     a.cal_activas,   0);
+  setM('cal-basales',     a.cal_basales,   0);
+  setM('distancia',       a.distancia,     2);
+  setM('distancia-cicl',  a.distancia_cicl,2);
+  setM('pisos',           a.pisos,         0);
+  setM('ejercicio-min',   a.ejercicio_min, 0);
+  setM('depie-min',       a.de_pie_min,    0);
+  setM('depie-horas',     a.de_pie_horas,  0);
+  setM('esfuerzo',        a.esfuerzo_fis,  2);
+  setM('luz',             a.luz_diurna,    0);
+
+  registerChart('sec-actividad','cal-series-chart','cal-series-wrap',
+    a.cal_activas?.series, '#ff9500','rgba(255,149,0,0.12)',
+    d => `<b>${d.h}:00</b><br>${d.v} kcal`);
+
+  // ── Corazón
+  setM('fc',         c.fc,              0);
+  setM('fc-reposo',  c.fc_reposo,       0);
+  setM('fc-caminar', c.fc_caminar,      0);
+  setM('hrv',        c.hrv,             1);
+  setM('fc-recov',   c.fc_recuperacion, 0);
+  setM('vo2',        r.vo2max,          1);
+  setM('spo2',       r.spo2,            1);
+
+  // Fila ECG — solo visible si hay registros ese día
+  const ecgRow = document.getElementById('ecg-day-row');
+  const ecgEl  = document.getElementById('m-ecg-count');
+  const ecgCount = am?.corazon?.ecg_count?.value || 0;  // ← viene de all_metrics si existe
+  // Consultar directamente desde /api/ecg/date
+  fetch('/api/ecg/date/' + currentDate).then(r=>r.json()).then(ecgs => {
+    if (ecgs && ecgs.length > 0) {
+      if (ecgRow) {
+        ecgRow.style.display = '';
+        ecgRow.onclick = openDashECG;
+      }
+      if (ecgEl) ecgEl.textContent = ecgs.length;
+    } else {
+      if (ecgRow) ecgRow.style.display = 'none';
+    }
+  }).catch(()=>{ if(ecgRow) ecgRow.style.display='none'; });
+  registerChart('sec-corazon','m-fc-chart','m-fc-chart-wrap',
+    c.fc?.series, '#ff6b6b','rgba(255,107,107,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} PPM`);
+  registerChart('sec-corazon','m-hrv-chart','m-hrv-chart-wrap',
+    c.hrv?.series, '#5b8dee','rgba(91,141,238,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} ms`);
+
+  // ── Respiración
+  setM('resp',       r.frec_resp,  1);
+  setM('spo2',       r.spo2,       1);
+  setM('alter-resp', r.alter_resp, 1);
+  setM('vo2',        r.vo2max,     1);
+  registerChart('sec-respiracion','m-resp-chart','m-resp-chart-wrap',
+    r.frec_resp?.series, '#34c759','rgba(52,199,89,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v} rpm`);
+  registerChart('sec-respiracion','m-spo2-chart','m-spo2-chart-wrap',
+    r.spo2?.series, '#ff3b5c','rgba(255,59,92,0.10)',
+    d => `<b>${d.h}:00</b><br>${d.v}%`);
+
+  // ── Sueño (formato diferente — viene de get_sleep_day)
+  const txt = id => document.getElementById('m-' + id);
+  const setTxt = (id, v) => { const el=txt(id); if(el) el.textContent = v ?? '—'; };
+  setTxt('sueno-total', s.total_str);
+  setTxt('sueno-deep',  s.deep_min  != null ? Math.round(s.deep_min) + ' min' : null);
+  setTxt('sueno-rem',   s.rem_min   != null ? Math.round(s.rem_min)  + ' min' : null);
+  setTxt('sueno-light', s.light_min != null ? Math.round(s.light_min)+ ' min' : null);
+  setTxt('sleep-total', s.total_str);
+  setTxt('sleep-deep',  s.deep_min  != null ? Math.round(s.deep_min) + ' min' : null);
+  setTxt('sleep-rem',   s.rem_min   != null ? Math.round(s.rem_min)  + ' min' : null);
+  setM('temp-muneca', t, 2);
+
+  // ── Marcha
+  setM('velocidad',   m.velocidad,     2);
+  setM('zancada',     m.longitud_zanca,1);
+  setM('doble-apoyo', m.doble_apoyo,   1);
+  setM('asimetria',   m.asimetria,     1);
+  setM('estabilidad', m.estabilidad,   1);
+  setM('vel-subida',  m.vel_subida,    2);
+  setM('vel-bajada',  m.vel_bajada,    2);
+  setM('test6min',    m.test_6min,     0);
+
+  // ── Cuerpo
+  setM('peso',       b.peso,      1);
+  setM('altura',     b.altura,    1);
+  setM('imc',        b.imc,       1);
+  setM('grasa',      b.grasa,     1);
+  setM('masa-magra', b.masa_magra,1);
+  setM('cintura',    b.cintura,   1);
+
+  // ── Audio
+  setM('ruido-env',     au.ruido_env,     1);
+  setM('ruido-auri',    au.ruido_auri,    1);
+  setM('eventos-audio', au.eventos_audio, 0);
+  setM('luz',           a.luz_diurna,     0);
+  setM('lavado-manos',  nu.lavado_manos,  0);
+  setM('agua',          nu.agua,          0);
+  const anm = am.animo || {};
+  setM('estado-animo',  anm.estado_animo, 0);
+  setM('ansiedad',      anm.ansiedad,     0);
+  setM('depresion',     anm.depresion,    0);
+
+  // ── Otros
+  setM('agua',   o.agua,         0);
+  setM('lavado', o.lavado_manos, 0);
+
+  // ── Gráfica FC del día — serie completa (raw) ────────────────────────────
+  const fcRaw = c.fc?.raw;
+  if (fcRaw && fcRaw.length > 1) {
+    const hrBlock = document.getElementById('hr-day-block');
+    if (hrBlock) hrBlock.style.display = 'block';
+    const fcMin = Math.min(...fcRaw.map(d=>d.v));
+    const fcMax = Math.max(...fcRaw.map(d=>d.v));
+    const fcAvg = Math.round(fcRaw.reduce((s,d)=>s+d.v,0)/fcRaw.length);
+    drawSectionLineChart(
+      'hr-day-canvas','hr-day-tip','hr-day-xaxis','hr-day-sub',
+      fcRaw, '#ff3b5c','rgba(255,59,92,0.12)',
+      d => `<b>${d.t}</b><br>${d.v} PPM`,
+      `${fcMin}–${fcMax} PPM · media ${fcAvg} PPM`
+    );
+  }
+
+  // ── Gráfica pasos por hora — barras ──────────────────────────────────────
+  const stepsSeries = a.pasos?.series;
+  if (stepsSeries && stepsSeries.length > 0) {
+    const stBlock = document.getElementById('steps-hour-block');
+    if (stBlock) stBlock.style.display = 'block';
+    const stTotal = stepsSeries.reduce((s,d)=>s+d.v,0);
+    drawStepsBarChart(
+      'steps-hour-canvas','steps-hour-tip','steps-hour-xaxis','steps-hour-sub',
+      stepsSeries,
+      `${Math.round(stTotal).toLocaleString('es-ES')} pasos totales`
+    );
+  }
+}

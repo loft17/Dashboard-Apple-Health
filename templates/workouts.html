@@ -3,6 +3,23 @@
 
 {% block extra_css %}
 <style>
+/* Resumen mensual */
+.wk-monthly-summary {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 18px; margin-bottom: 14px;
+}
+.wk-summary-items {
+  display: flex; flex-wrap: wrap; gap: 0;
+  font-family: var(--font-mono); font-size: 13px; color: var(--text);
+}
+.wk-summary-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 14px; border-right: 1px solid var(--border);
+}
+.wk-summary-item:first-child { padding-left: 0; }
+.wk-summary-item:last-child  { border-right: none; }
+.wk-summary-val  { font-weight: 600; }
+.wk-summary-key  { color: var(--muted); font-size: 11px; }
 /* ── Lista ────────────────────────────────────────────────────────────────── */
 .wk-header-row {
   display: flex; align-items: baseline; gap: 12px;
@@ -169,6 +186,10 @@
 {% block content %}
 <div class="wk-header-row">
   <h2 class="wk-header-title">Entrenamientos</h2>
+  <a href="/workouts/mapa-rutas" style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:0 12px;height:30px;transition:all .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Mapa de rutas
+  </a>
   <span class="wk-header-count" id="wk-count-label"></span>
 </div>
 
@@ -182,6 +203,10 @@
     <option value="all">Todo el historial</option>
   </select>
   <button class="wk-clear-btn" onclick="clearWkFilters()">✕ Limpiar</button>
+</div>
+
+<div class="wk-monthly-summary" id="wk-monthly-summary" style="display:none">
+  <div class="wk-summary-items" id="wk-summary-items"></div>
 </div>
 
 <div class="wk-list"    id="wk-list-body"></div>
@@ -239,6 +264,7 @@ function applyWkFilters() {
   );
   _wkPage = 0;
   renderWkList();
+  renderMonthlySummary(ALL_WK);
 }
 
 function clearWkFilters() {
@@ -253,6 +279,28 @@ document.getElementById('wk-text-filter')?.addEventListener('input', applyWkFilt
 document.getElementById('wk-type-filter')?.addEventListener('change', applyWkFilters);
 
 // ── Renderizar lista ──────────────────────────────────────────────────────────
+function renderMonthlySummary(workouts) {
+  const wrap  = document.getElementById('wk-monthly-summary');
+  const items = document.getElementById('wk-summary-items');
+  if (!workouts || !workouts.length) { wrap.style.display='none'; return; }
+  const n    = workouts.length;
+  const km   = workouts.reduce((s,w)=>s+(parseFloat(w.distance_km)||0),0);
+  const kcal = workouts.reduce((s,w)=>s+(parseInt(w.kcal)||0),0);
+  const secs = workouts.reduce((s,w)=>s+((parseFloat(w.duration_min)||0)*60),0);
+  const hh=Math.floor(secs/3600), mm=Math.floor((secs%3600)/60);
+  const durStr = hh>0?`${hh}h ${mm}m`:`${mm}m`;
+  const period = document.getElementById('wk-period-filter')?.value||'month';
+  const LABELS = {week:'Esta semana',month:'Este mes',year:'Este año',all:'Histórico'};
+  items.innerHTML = `
+    <div class="wk-summary-item"><span class="wk-summary-val">${LABELS[period]||period}</span></div>
+    <div class="wk-summary-item"><span class="wk-summary-val">${n}</span><span class="wk-summary-key">entrenamientos</span></div>
+    ${km>0?`<div class="wk-summary-item"><span class="wk-summary-val">${km.toFixed(1)}</span><span class="wk-summary-key">km</span></div>`:''}
+    <div class="wk-summary-item"><span class="wk-summary-val">${durStr}</span><span class="wk-summary-key">tiempo</span></div>
+    ${kcal>0?`<div class="wk-summary-item"><span class="wk-summary-val">${kcal.toLocaleString('es-ES')}</span><span class="wk-summary-key">kcal</span></div>`:''}
+  `;
+  wrap.style.display='block';
+}
+
 function renderWkList() {
   const body  = document.getElementById('wk-list-body');
   const noRes = document.getElementById('wk-no-results');
