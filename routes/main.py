@@ -5,6 +5,7 @@ Blueprint para la página de inicio y la subida del ZIP.
 
 import threading
 from pathlib import Path
+from flask_login import login_required
 
 from flask import Blueprint, current_app, jsonify, render_template, request, Response, stream_with_context
 import json, queue, time
@@ -13,6 +14,23 @@ from services.db       import load_stats
 from services.importer import import_state, process_zip, progress_queue
 
 main_bp = Blueprint('main', __name__)
+
+
+@main_bp.route('/api/types')
+@login_required
+def api_types():
+    """Lista todos los tipos de datos en la BD — útil para configuración."""
+    from flask import jsonify
+    from flask_login import login_required as _lr
+    from services.db import get_conn, DB_FILE
+    if not DB_FILE.exists():
+        return jsonify([])
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT type, COUNT(*) as n, MIN(date_day) as first, MAX(date_day) as last "
+            "FROM records GROUP BY type ORDER BY n DESC"
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 
 @main_bp.route('/sw.js')
@@ -106,3 +124,94 @@ def import_status():
 def status():
     stats = load_stats()
     return jsonify(stats or {'status': 'empty'})
+
+
+@main_bp.route('/api/debug/mindful')
+@login_required
+def debug_mindful():
+    """Diagnóstico de sesiones de mindfulness."""
+    from services.db import get_conn, DB_FILE
+    if not DB_FILE.exists():
+        return jsonify({'error': 'No DB'})
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT type, date_day, start_date, end_date, value, value_str "
+            "FROM records WHERE type LIKE '%Mindful%' OR type LIKE '%mindful%' "
+            "ORDER BY start_date DESC LIMIT 10"
+        ).fetchall()
+        count = conn.execute(
+            "SELECT COUNT(*) FROM records WHERE type LIKE '%Mindful%'"
+        ).fetchone()[0]
+    return jsonify({
+        'total': count,
+        'records': [dict(r) for r in rows]
+    })
+
+
+@main_bp.route('/api/debug/mood-types')
+@login_required  
+def debug_mood_types():
+    """Busca todos los tipos relacionados con ánimo, bienestar y salud mental."""
+    from services.db import get_conn, DB_FILE
+    if not DB_FILE.exists():
+        return jsonify({'error': 'No DB'})
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT type, COUNT(*) as n, MIN(date_day) as first, MAX(date_day) as last,
+                   MIN(value_str) as sample_str, MIN(CAST(value AS TEXT)) as sample_val
+            FROM records 
+            WHERE type LIKE '%Mind%' OR type LIKE '%Mood%' OR type LIKE '%State%'
+               OR type LIKE '%Anxiety%' OR type LIKE '%Depression%' OR type LIKE '%Mental%'
+               OR type LIKE '%Wellbeing%' OR type LIKE '%Emotion%'
+            GROUP BY type ORDER BY n DESC
+        """).fetchall()
+        # También buscar por value_str que contenga mood/emotion keywords
+        sample = conn.execute("""
+            SELECT DISTINCT type, value_str FROM records
+            WHERE value_str LIKE '%Happy%' OR value_str LIKE '%Sad%' 
+               OR value_str LIKE '%Anxious%' OR value_str LIKE '%Calm%'
+               OR value_str LIKE '%Depressed%'
+            LIMIT 10
+        """).fetchall()
+    return jsonify({
+        'types': [dict(r) for r in rows],
+        'mood_samples': [dict(r) for r in sample]
+    })
+
+
+@main_bp.route('/api/debug/noise-check')
+@login_required
+def debug_noise_check():
+    """Diagnóstico del ruido ambiental."""
+    from services.db import get_conn, DB_FILE
+    if not DB_FILE.exists():
+        return jsonify({'error': 'No DB'})
+    with get_conn() as conn:
+        # Días con datos
+        days = conn.execute(
+            "SELECT date_day, COUNT(*) as n, AVG(value) as avg_db "
+            "FROM records WHERE type='HKQuantityTypeIdentifierEnvironmentalAudioExposure' "
+            "AND value IS NOT NULL GROUP BY date_day ORDER BY date_day DESC LIMIT 5"
+        ).fetchall()
+        # Muestra de registros raw
+        sample = conn.execute(
+            "SELECT date_day, substr(start_date,1,19) as t, value "
+            "FROM records WHERE type='HKQuantityTypeIdentifierEnvironmentalAudioExposure' "
+            "AND value IS NOT NULL ORDER BY start_date DESC LIMIT 5"
+        ).fetchall()
+        # Test de la query de serie horaria para el día más reciente
+        last_day = days[0]['date_day'] if days else None
+        series = []
+        if last_day:
+            series = conn.execute(
+                "SELECT substr(start_date,11,6) as t, AVG(value) as v "
+                "FROM records WHERE type='HKQuantityTypeIdentifierEnvironmentalAudioExposure' "
+                "AND date_day=? AND value IS NOT NULL "
+                "GROUP BY substr(start_date,1,13) ORDER BY start_date",
+                (last_day,)
+            ).fetchall()
+    return jsonify({
+        'recent_days': [dict(r) for r in days],
+        'sample_raw':  [dict(r) for r in sample],
+        'series_test': {'date': last_day, 'points': len(series), 'sample': [dict(r) for r in series[:3]]}
+    })

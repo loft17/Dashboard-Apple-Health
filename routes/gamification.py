@@ -43,61 +43,33 @@ def api_challenge_save():
     return jsonify({'ok': True})
 
 
-# ── Logros personalizados ─────────────────────────────────────────────────────
-@gami_bp.route('/api/gamification/custom-achievements', methods=['GET'])
+
+@gami_bp.route('/api/gamification/stats')
 @login_required
-def api_custom_ach_get():
-    from services.db import get_conn, DB_FILE
-    if not DB_FILE.exists():
-        return jsonify([])
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM custom_achievements ORDER BY unlocked DESC, created_at DESC"
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
+def api_stats():
+    from services.gamification import get_global_stats
+    return jsonify(get_global_stats())
 
 
-@gami_bp.route('/api/gamification/custom-achievements', methods=['POST'])
+@gami_bp.route('/api/gamification/challenge/<int:chal_id>', methods=['DELETE'])
 @login_required
-def api_custom_ach_create():
+def api_challenge_delete(chal_id):
     from services.db import get_conn
-    d = request.get_json() or {}
-    emoji       = d.get('emoji', '🎯').strip() or '🎯'
-    label       = d.get('label', '').strip()
-    desc        = d.get('desc', '').strip()
-    target_type = d.get('target_type', 'manual')
-    target_val  = d.get('target_val')
-    if not label:
-        return jsonify({'ok': False, 'error': 'Nombre obligatorio'}), 400
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO custom_achievements (emoji,label,desc,target_type,target_val) VALUES (?,?,?,?,?)",
-            (emoji, label, desc, target_type, target_val)
-        )
-        conn.commit()
-        row_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    return jsonify({'ok': True, 'id': row_id})
-
-
-@gami_bp.route('/api/gamification/custom-achievements/<int:ach_id>/unlock', methods=['POST'])
-@login_required
-def api_custom_ach_unlock(ach_id):
-    from services.db import get_conn
-    today = datetime.now().strftime('%Y-%m-%d')
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE custom_achievements SET unlocked=1, unlock_date=? WHERE id=?",
-            (today, ach_id)
-        )
+        conn.execute("DELETE FROM challenges WHERE id=?", (chal_id,))
         conn.commit()
     return jsonify({'ok': True})
 
 
-@gami_bp.route('/api/gamification/custom-achievements/<int:ach_id>', methods=['DELETE'])
+@gami_bp.route('/api/gamification/challenge/<int:chal_id>', methods=['PUT'])
 @login_required
-def api_custom_ach_delete(ach_id):
+def api_challenge_update(chal_id):
     from services.db import get_conn
+    d = request.get_json() or {}
     with get_conn() as conn:
-        conn.execute("DELETE FROM custom_achievements WHERE id=?", (ach_id,))
+        conn.execute(
+            "UPDATE challenges SET label=?, target=?, unit=? WHERE id=?",
+            (d.get('label',''), d.get('target',0), d.get('unit',''), chal_id)
+        )
         conn.commit()
     return jsonify({'ok': True})

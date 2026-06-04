@@ -1,77 +1,146 @@
-# Apple Health Dashboard
+# Health Dashboard — Apple Health
 
-Dashboard personal para visualizar datos de Apple Health.
-Los datos se almacenan localmente en tu servidor Debian.
+Dashboard personal para visualizar y analizar los datos exportados de Apple Health.
 
-## Estructura del proyecto
+---
 
-```
-health_dashboard/
-├── app.py              # Servidor Flask principal
-├── requirements.txt    # Dependencias Python
-├── templates/
-│   └── index.html      # Página de inicio
-├── data/               # Base de datos local (JSON/SQLite)
-├── uploads/            # ZIPs temporales durante importación
-└── static/             # CSS/JS adicional si se necesita
-```
-
-## Instalación en Debian
+## Instalación
 
 ```bash
-# 1. Clonar / copiar el proyecto
-cd /opt
-sudo mkdir health_dashboard
-sudo chown $USER: health_dashboard
-
-# 2. Crear entorno virtual
-python3 -m venv venv
-source venv/bin/activate
-
-# 3. Instalar dependencias
 pip install -r requirements.txt
-
-# 4. Arrancar el servidor
 python app.py
 ```
 
-El servidor escucha en `http://0.0.0.0:5050`
+Abre `http://127.0.0.1:5050` en el navegador.
 
-## Ejecutar como servicio systemd
+---
 
-Crea `/etc/systemd/system/health-dashboard.service`:
+## Configuración
 
-```ini
-[Unit]
-Description=Apple Health Dashboard
-After=network.target
+### Variables de entorno (opcionales)
 
-[Service]
-User=TU_USUARIO
-WorkingDirectory=/opt/health_dashboard
-ExecStart=/opt/health_dashboard/venv/bin/python app.py
-Restart=always
-RestartSec=5
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| `HEALTH_USER` | `admin` | Usuario de acceso |
+| `HEALTH_PASSWORD` | `admin` | Contraseña inicial (fuerza cambio al primer login) |
+| `SECRET_KEY` | Auto-generado | Clave de sesión (se guarda en `data/secret_key.txt`) |
+| `PORT` | `5050` | Puerto del servidor |
+| `DEBUG` | `0` | Activar modo debug (`1` = activado) |
 
-[Install]
-WantedBy=multi-user.target
+### Primera vez
+
+Al entrar con `admin` / `admin` el sistema obliga a cambiar las credenciales antes de continuar.
+
+---
+
+## Importar datos
+
+1. En el iPhone: **Salud → tu perfil → Exportar datos de salud**
+2. Envía el ZIP al ordenador
+3. En el dashboard: **Ajustes → Importar datos** y arrastra el ZIP
+
+---
+
+## Modo Debug
+
+El modo debug activa endpoints adicionales para diagnóstico.
+
+**En Windows** (dos comandos separados):
+```
+set DEBUG=1
+python app.py
 ```
 
+**En Linux / Mac**:
 ```bash
-sudo systemctl enable health-dashboard
-sudo systemctl start health-dashboard
+DEBUG=1 python app.py
 ```
 
-## Cómo exportar desde Apple Health
+> ⚠️ Con `set DEBUG=1 && python app.py` en Windows el `&&` **no** pasa la variable al proceso. Hay que ejecutarlos por separado.
 
-1. Abrir Apple Health en iPhone
-2. Foto de perfil (arriba a la derecha)
-3. "Exportar todos los datos de salud"
-4. Compartir el `export.zip` resultante
-5. Subirlo desde la web del dashboard
+### Endpoints de debug (solo con DEBUG=1)
 
-## Próximos pasos (pendientes)
+| URL | Descripción |
+|-----|-------------|
+| `/api/debug/sleep-hist2` | Diagnóstico del sueño histórico |
+| `/api/debug/temp-check` | Datos de temperatura de muñeca |
 
-- [ ] Parser del export.zip de Apple Health
-- [ ] Base de datos SQLite con deduplicación
-- [ ] Dashboard con métricas y gráficas
+### Endpoints siempre disponibles
+
+| URL | Descripción |
+|-----|-------------|
+| `/api/types` | Lista todos los tipos de datos en la BD con conteos y fechas |
+
+---
+
+## Estructura de archivos
+
+```
+health_dashboard/
+├── app.py                    # Punto de entrada
+├── requirements.txt
+├── README.md
+├── routes/                   # Blueprints Flask
+│   ├── main.py               # / → redirige según datos
+│   ├── auth.py               # /login /logout /change-password
+│   ├── dashboard.py          # /dashboard /api/day
+│   ├── health_data.py        # /salud/<date>
+│   ├── history.py            # /historico /api/history
+│   ├── workout.py            # /workouts /workouts/<idx>
+│   ├── ecg.py                # /ecg
+│   ├── wrapped.py            # /año/<year>
+│   ├── gamification.py       # /logros /api/gamification/*
+│   ├── settings.py           # /ajustes /api/settings/*
+│   └── debug.py              # Solo con DEBUG=1
+├── services/
+│   ├── db.py                 # SQLite — todas las queries
+│   ├── workout.py            # Parser de entrenamientos
+│   ├── ecg.py                # Parser de ECG
+│   └── gamification.py      # Rachas, logros, retos
+├── templates/                # HTML (Jinja2)
+├── static/
+│   ├── css/
+│   ├── js/
+│   ├── sw.js                 # Service Worker (caché offline)
+│   ├── manifest.json         # PWA
+│   └── favicon.svg
+└── data/                     # Generado en runtime (no en git)
+    ├── health.db             # Base de datos SQLite
+    ├── credentials.json      # Usuario/contraseña hasheados
+    └── secret_key.txt        # Clave de sesión persistente
+```
+
+---
+
+## Páginas principales
+
+| URL | Descripción |
+|-----|-------------|
+| `/dashboard` | Resumen del día con métricas clave y anillos |
+| `/salud/<fecha>` | Todos los datos de salud de un día |
+| `/historico` | Gráficas históricas de todas las métricas |
+| `/workouts` | Lista de entrenamientos con mapa de rutas |
+| `/workouts/<n>` | Detalle de un entrenamiento con mapa GPS |
+| `/ecg` | Registros de ECG |
+| `/historico` | Histórico con gráficas por período |
+| `/año/<año>` | Resumen anual estilo Wrapped |
+| `/logros` | Logros desbloqueados, retos y estadísticas |
+| `/ajustes` | Importar datos, credenciales, objetivos, Obsidian, exportar para IA |
+
+---
+
+## Seguridad
+
+- Las credenciales se guardan hasheadas (SHA-256) en `data/credentials.json`
+- La SECRET_KEY se genera una vez y se persiste en `data/secret_key.txt`
+- Las sesiones duran 30 días
+- Todas las rutas requieren autenticación excepto `/login` y `/sw.js`
+- Los endpoints de debug solo están activos con `DEBUG=1`
+
+---
+
+## Requisitos
+
+- Python 3.10+
+- Ver `requirements.txt` para dependencias
+

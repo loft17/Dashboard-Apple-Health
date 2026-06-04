@@ -113,7 +113,7 @@ async function loadYear(year) {
   document.getElementById('wr-prev').disabled = year <= 2016;
   document.getElementById('wr-next').disabled = year >= CURRENT_YEAR;
   document.getElementById('wr-content').innerHTML = '<div class="wr-loading">Calculando…</div>';
-  history.replaceState({}, '', '/año?year=' + year);
+  history.replaceState({}, '', '/año/' + year);
   try {
     const r = await fetch('/api/wrapped/' + year);
     const d = await r.json();

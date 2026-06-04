@@ -845,8 +845,12 @@ def get_extra_metrics(date_str: str) -> dict:
     steadiness= _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleWalkingSteadiness')
     hr_recov  = _last_numeric(date_str, 'HKQuantityTypeIdentifierHeartRateRecoveryOneMinute')
     vo2max    = _last_numeric(date_str, 'HKQuantityTypeIdentifierVO2Max')
-    noise_env = _avg_numeric(date_str, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure')
-    noise_hp  = _avg_numeric(date_str, 'HKQuantityTypeIdentifierHeadphoneAudioExposure')
+    noise_env    = _avg_numeric(date_str, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure')
+    noise_hp     = _avg_numeric(date_str, 'HKQuantityTypeIdentifierHeadphoneAudioExposure')
+    wrist_temp   = _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleSleepingWristTemperature')
+    breath_dist  = _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances')
+    audio_events   = _count_records(date_str, 'HKCategoryTypeIdentifierAudioExposureEvent')
+    # mindful_min se calcula en get_all_metrics directamente desde los registros del día
     water     = _sum_numeric(date_str, {'HKQuantityTypeIdentifierDietaryWater'})
     bmi       = _last_numeric(date_str, 'HKQuantityTypeIdentifierBodyMassIndex')
     handwash  = _count_records(date_str, 'HKCategoryTypeIdentifierHandwashingEvent')
@@ -1039,11 +1043,59 @@ def get_all_metrics(date_str: str) -> dict:
     # get_sleep_day ya devuelve el resumen procesado
     sueño_raw = get_sleep_day(date_str)
 
-    # ── Audio ──────────────────────────────────────────────────────────────────
+    # ── Audio y mindfulness ──────────────────────────────────────────────────────
+    # Calcular minutos de mindfulness para este día (query directa)
+    _mindful_min = 0.0
+    if DB_FILE.exists():
+        with get_conn() as conn:
+            # Calcular duración en SQL directamente con substr para evitar TZ
+            row = conn.execute(
+                "SELECT SUM(CAST((julianday(substr(end_date,1,19)) "
+                "       - julianday(substr(start_date,1,19))) * 1440 AS REAL)) as mins "
+                "FROM records WHERE type='HKCategoryTypeIdentifierMindfulSession' "
+                "AND date_day=?",
+                (date_str,)
+            ).fetchone()
+            _mindful_min = float(row['mins'] or 0)
+
+    # Serie horaria de ruido ambiental (igual que FC del día)
+    _noise_series = []
+    if DB_FILE.exists():
+        with get_conn() as conn:
+            _nrows = conn.execute(
+                "SELECT substr(start_date,12,5) as t, AVG(value) as v "
+                "FROM records WHERE type='HKQuantityTypeIdentifierEnvironmentalAudioExposure' "
+                "AND date_day=? AND value IS NOT NULL "
+                "GROUP BY substr(start_date,1,13) ORDER BY start_date",
+                (date_str,)
+            ).fetchall()
+            _noise_series = [{'t': r['t'], 'v': round(float(r['v']),1)} for r in _nrows if r['v']]
+
+    # Serie horaria de auriculares
+    _auri_series = []
+    if DB_FILE.exists():
+        with get_conn() as conn:
+            _arows = conn.execute(
+                "SELECT substr(start_date,12,5) as t, AVG(value) as v "
+                "FROM records WHERE type='HKQuantityTypeIdentifierHeadphoneAudioExposure' "
+                "AND date_day=? AND value IS NOT NULL "
+                "GROUP BY substr(start_date,1,13) ORDER BY start_date",
+                (date_str,)
+            ).fetchall()
+            _auri_series = [{'t': r['t'], 'v': round(float(r['v']),1)} for r in _arows if r['v']]
+
+    _ruido_env_base  = _metric(d, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure', 'avg', 1, 1)
+    _ruido_auri_base = _metric(d, 'HKQuantityTypeIdentifierHeadphoneAudioExposure',     'avg', 1, 1)
+    if _ruido_env_base:  _ruido_env_base['series']  = _noise_series
+    if _ruido_auri_base: _ruido_auri_base['series'] = _auri_series
+
     audio = {
-        'ruido_env':      _metric(d, 'HKQuantityTypeIdentifierEnvironmentalAudioExposure', 'avg', 1, 1),
-        'ruido_auri':     _metric(d, 'HKQuantityTypeIdentifierHeadphoneAudioExposure',     'avg', 1, 1),
-        'eventos_audio':  _metric(d, 'HKCategoryTypeIdentifierAudioExposureEvent',         'count'),
+        'temp_muneca':      _metric(d, 'HKQuantityTypeIdentifierAppleSleepingWristTemperature', 'avg', 1, 2),
+        'alter_resp_sleep': _metric(d, 'HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances', 'avg', 1, 1),
+        'mindful_min':      {'value': round(_mindful_min, 1), 'unit': 'min'},
+        'ruido_env':        _ruido_env_base  or {'value': None, 'series': []},
+        'ruido_auri':       _ruido_auri_base or {'value': None, 'series': []},
+        'eventos_audio':    _metric(d, 'HKCategoryTypeIdentifierAudioExposureEvent', 'count'),
     }
 
     # ── Temperatura (sueño) ────────────────────────────────────────────────────
@@ -1063,11 +1115,7 @@ def get_all_metrics(date_str: str) -> dict:
         'cuerpo':      cuerpo,
         'sueno':       sueño_raw,
         'audio':       audio,
-        'animo': {
-            'estado_animo': _metric(d, 'HKStateOfMindLabel',                              'last', 1, 0),
-            'ansiedad':     _metric(d, 'HKCategoryTypeIdentifierGeneralizedAnxietyDisorder','last',1, 0),
-            'depresion':    _metric(d, 'HKCategoryTypeIdentifierDepressionRisk',           'last',1, 0),
-        },
+        # ánimo: eliminado — requiere registro manual iOS 17+
         'temp_muneca': temp_muneca,
         'otros':       otros,
     }
@@ -1327,6 +1375,11 @@ def get_history(metric: str, period: str, offset: int = 0) -> list[dict]:
         'esfuerzo':   ('HKQuantityTypeIdentifierPhysicalEffort',              'avg'),
         'luz':        ('HKQuantityTypeIdentifierTimeInDaylight',              'sum'),
         'vo2':        ('HKQuantityTypeIdentifierVO2Max',                      'avg'),
+        'temp_muneca':   ('HKQuantityTypeIdentifierAppleSleepingWristTemperature','avg'),
+        'ruido_auri':    ('HKQuantityTypeIdentifierHeadphoneAudioExposure',          'avg'),
+        'ruido_env':     ('HKQuantityTypeIdentifierEnvironmentalAudioExposure',      'avg'),
+        'alter_resp_sleep': ('HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances', 'avg'),
+        'mindful':          ('HKCategoryTypeIdentifierMindfulSession',                     'count'),
     }
 
     if metric not in TYPES:
@@ -1354,6 +1407,40 @@ def get_history(metric: str, period: str, offset: int = 0) -> list[dict]:
         group_by  = "strftime('%Y-%m', date_day)"   # un punto por mes
 
     date_to = now.strftime('%Y-%m-%d')
+
+    # Mindfulness: calcular minutos totales por día (no count)
+    if metric == 'mindful':
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT date_day, substr(start_date,1,19) as s, substr(end_date,1,19) as e "
+                "FROM records WHERE type='HKCategoryTypeIdentifierMindfulSession' "
+                "AND date_day>=? AND date_day<=? ORDER BY date_day",
+                (date_from, date_to)
+            ).fetchall()
+        from collections import defaultdict as _dd
+        from datetime import datetime as _dtt
+        daily = _dd(float)
+        for r in rows:
+            try:
+                s = _dtt.strptime(r['s'], '%Y-%m-%d %H:%M:%S')
+                e = _dtt.strptime(r['e'], '%Y-%m-%d %H:%M:%S')
+                daily[r['date_day']] += (e-s).total_seconds()/60
+            except Exception:
+                pass
+        raw = [{'date': k, 'v': round(v, 1)} for k, v in sorted(daily.items())]
+        if period in ('year','all'):
+            fmt = '%Y-%W' if period == 'year' else '%Y-%m'
+            from collections import defaultdict as _dd2
+            from datetime import datetime as _dtt2
+            grouped = _dd2(list)
+            for item in raw:
+                try:
+                    key = _dtt2.strptime(item['date'],'%Y-%m-%d').strftime(fmt)
+                    grouped[key].append(item['v'])
+                except Exception:
+                    pass
+            return [{'date': k, 'v': round(sum(vs),1)} for k, vs in sorted(grouped.items())]
+        return raw
 
     # Sueño: contar sólo minutos dormidos (no InBed)
     if metric == 'sueno':

@@ -1,8 +1,5 @@
 /**
- * health_metrics.js — Funciones compartidas entre dashboard y salud
- * Requiere: gTooltip, _canvasHover, showTooltip, hideTooltipForce,
- *           drawLineChart, setM, setTxt, _pendingCharts, registerChart,
- *           currentDate definidos en la página que lo carga
+ * health_metrics.js
  */
 // ── Gráfica de fases de sueño estilo Apple ───────────────────────────────────
 function drawSleepPhases(segments) {
@@ -237,8 +234,14 @@ function drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color
     ctx.beginPath();ctx.arc(hp.x,hp.y,5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
     ctx.beginPath();ctx.arc(hp.x,hp.y,8,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.globalAlpha=.25;ctx.stroke();ctx.globalAlpha=1;
     // Tooltip
+    const tooltipHtml = labelFn(pts[best].d);
     if (tip) {
-      tip.innerHTML = labelFn(pts[best].d);
+      tip.innerHTML = tooltipHtml;
+      tip.style.display='block';
+      tip.style.left = (e.clientX-rect.left)+'px';
+      tip.style.top  = (hp.y/H*rect.height-8)+'px';
+    } else if (typeof showTooltip === 'function') {
+      showTooltip(e.clientX, e.clientY, tooltipHtml);
       tip.style.display='block';
       tip.style.left = (e.clientX-rect.left)+'px';
       tip.style.top  = (hp.y/H*rect.height-8)+'px';
@@ -246,6 +249,7 @@ function drawSectionLineChart(canvasId, tipId, xaxisId, subId, dataPoints, color
   };
   canvas.onmouseleave = () => {
     if(tip) tip.style.display='none';
+    if (!tip && typeof hideTooltipForce === 'function') hideTooltipForce();
     ctx.clearRect(0,0,W,H);
     // Redibujar sin hover
     const grad3=ctx.createLinearGradient(0,0,0,H);grad3.addColorStop(0,fillColor);grad3.addColorStop(1,'rgba(255,255,255,0)');
@@ -666,6 +670,14 @@ function updateAllMetrics(am) {
   setTxt('sleep-deep',  s.deep_min  != null ? Math.round(s.deep_min) + ' min' : null);
   setTxt('sleep-rem',   s.rem_min   != null ? Math.round(s.rem_min)  + ' min' : null);
   setM('temp-muneca', t, 2);
+  // También poblar el nuevo card con ID distinto
+  const tempValEl = document.getElementById('m-temp-muneca-val');
+  if (tempValEl && t && t.value != null) {
+    tempValEl.textContent = parseFloat(t.value).toFixed(1);
+    const rangeEl = document.getElementById('m-temp-muneca-range');
+    if (rangeEl && t.min != null && t.max != null)
+      rangeEl.textContent = t.min.toFixed(1) + '–' + t.max.toFixed(1) + ' °C esta noche';
+  }
 
   // ── Marcha
   setM('velocidad',   m.velocidad,     2);
@@ -688,14 +700,65 @@ function updateAllMetrics(am) {
   // ── Audio
   setM('ruido-env',     au.ruido_env,     1);
   setM('ruido-auri',    au.ruido_auri,    1);
+  // Eventos audio alto
+  const audioEvEl = document.getElementById('m-eventos-audio');
+  if (audioEvEl) audioEvEl.textContent = (au.eventos_audio?.value ?? 0);
+
+  // Mindfulness
+  // Gráficas de ruido ambiental y auriculares
+  const noiseEnvSeries = au.ruido_env?.series || [];
+  if (noiseEnvSeries.length > 1) {
+    const nb = document.getElementById('noise-env-block');
+    if (nb) nb.style.display = 'block';
+    const nMin = Math.min(...noiseEnvSeries.map(d=>d.v));
+    const nMax = Math.max(...noiseEnvSeries.map(d=>d.v));
+    const nAvg = Math.round(noiseEnvSeries.reduce((s,d)=>s+d.v,0)/noiseEnvSeries.length);
+    const nSub = document.getElementById('noise-env-sub');
+    if (nSub) nSub.textContent = nMin+'\u2013'+nMax+' dB · media '+nAvg+' dB';
+    drawSectionLineChart('noise-env-canvas','','noise-env-xaxis','noise-env-sub',
+      noiseEnvSeries,'#64748b','rgba(100,116,139,.12)',
+      d=>'<b>'+d.t+'</b><br>'+d.v+' dB',
+      nMin+'\u2013'+nMax+' dB · media '+nAvg+' dB');
+  }
+  const noiseAuriSeries = au.ruido_auri?.series || [];
+  if (noiseAuriSeries.length > 1) {
+    const ab = document.getElementById('noise-auri-block');
+    if (ab) ab.style.display = 'block';
+    const aMin = Math.min(...noiseAuriSeries.map(d=>d.v));
+    const aMax = Math.max(...noiseAuriSeries.map(d=>d.v));
+    const aAvg = Math.round(noiseAuriSeries.reduce((s,d)=>s+d.v,0)/noiseAuriSeries.length);
+    drawSectionLineChart('noise-auri-canvas','','noise-auri-xaxis','noise-auri-sub',
+      noiseAuriSeries,'#8b5cf6','rgba(139,92,246,.12)',
+      d=>'<b>'+d.t+'</b><br>'+d.v+' dB',
+      aMin+'\u2013'+aMax+' dB · media '+aAvg+' dB');
+  }
+
+  const mindfulEl  = document.getElementById('m-mindful-min');
+  const mindfulSes = document.getElementById('m-mindful-sessions');
+  const mindfulVal = au?.mindful_min?.value ?? am?.otros?.mindful_min?.value;
+  if (mindfulEl && mindfulVal != null) {
+    mindfulEl.textContent = mindfulVal > 0 ? Math.round(mindfulVal) : '—';
+    if (mindfulSes) mindfulSes.textContent = mindfulVal > 0 ? '✓ Sesión registrada hoy' : '';
+  }
+
+  // Alteraciones respiratorias durante el sueño
+  const arEl  = document.getElementById('m-alter-resp');
+  const arLvl = document.getElementById('m-alter-resp-level');
+  const arSrc = am.sueno?.alter_resp_sleep ?? au?.alter_resp_sleep;
+  const arVal = arSrc?.value;
+  if (arEl && arVal != null) {
+    arEl.textContent = parseFloat(arVal).toFixed(1);
+    if (arLvl) {
+      const v = parseFloat(arVal);
+      arLvl.textContent = v < 5 ? '✓ Normal' : v < 10 ? '⚠️ Elevado' : '❌ Alto';
+      arLvl.style.color = v < 5 ? '#1a8a4a' : v < 10 ? '#f59e0b' : '#c0392b';
+    }
+  }
   setM('eventos-audio', au.eventos_audio, 0);
   setM('luz',           a.luz_diurna,     0);
   setM('lavado-manos',  nu.lavado_manos,  0);
   setM('agua',          nu.agua,          0);
-  const anm = am.animo || {};
-  setM('estado-animo',  anm.estado_animo, 0);
-  setM('ansiedad',      anm.ansiedad,     0);
-  setM('depresion',     anm.depresion,    0);
+
 
   // ── Otros
   setM('agua',   o.agua,         0);

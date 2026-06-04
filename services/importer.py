@@ -40,9 +40,16 @@ def process_zip(zip_path: Path) -> None:
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
             names = zf.namelist()
-            xml_candidates = [n for n in names if n.endswith('export.xml')]
+            # Buscar XML principal — compatible con español (exportación.xml) e inglés (export.xml)
+            xml_candidates = [n for n in names if n.endswith('.xml') and
+                              any(kw in n.lower() for kw in ('export', 'exportaci'))]
             if not xml_candidates:
-                raise ValueError('No se encontró export.xml dentro del ZIP')
+                # Fallback: cualquier XML en la raíz
+                xml_candidates = [n for n in names if n.endswith('.xml') and '/' not in n.rstrip('/').lstrip('/').replace(n.split('/')[0]+'/', '')]
+            if not xml_candidates:
+                xml_candidates = [n for n in names if n.endswith('.xml')]
+            if not xml_candidates:
+                raise ValueError('No se encontró ningún XML de Apple Health dentro del ZIP')
 
             xml_name = xml_candidates[0]
             zip_mb = round(zip_path.stat().st_size / 1024 / 1024, 1)

@@ -11,17 +11,6 @@ from services.db import get_conn, DB_FILE, get_user_goals
 
 ACHIEVEMENTS_DEF = [
 
-    # ── Anillos ───────────────────────────────────────────────────────────────
-    {'key': 'rings_10',    'label': 'Anillos completos × 10',    'emoji': '⭕',
-     'desc': '10 veces completar todos los anillos',
-     'type': 'rings_complete', 'threshold': 10,  'count_mode': False},
-    {'key': 'rings_100',   'label': 'Anillos completos × 100',   'emoji': '🔴',
-     'desc': '100 veces completar todos los anillos',
-     'type': 'rings_complete', 'threshold': 100, 'count_mode': False},
-    {'key': 'rings_500',   'label': 'Anillos completos × 500',   'emoji': '🔵',
-     'desc': '500 veces completar todos los anillos',
-     'type': 'rings_complete', 'threshold': 500, 'count_mode': False},
-
     # ── Objetivo de movimiento (pasos alcanzados) ─────────────────────────────
     {'key': 'move_goal_500', 'label': '500 objetivos de movimiento', 'emoji': '🎯',
      'desc': '500 veces alcanzar el objetivo diario de pasos',
@@ -42,6 +31,61 @@ ACHIEVEMENTS_DEF = [
     {'key': 'kcal_500',    'label': 'Gastar 500 kcal',            'emoji': '🔥',
      'desc': 'Quemar 500 kcal activas en un día',
      'type': 'calories_day', 'threshold': 500, 'count_mode': True},
+
+    # ── Distancia en una semana ──────────────────────────────────────────────
+    {'key': 'week_5k',      'label': '5 km en una semana',        'emoji': '🚶',
+     'desc': 'Caminar/correr 5 km en 7 días consecutivos',
+     'type': 'dist_week', 'threshold': 5,    'count_mode': True},
+    {'key': 'week_marathon', 'label': 'Maratón en una semana',    'emoji': '🏃',
+     'desc': '42 km acumulados en una semana',
+     'type': 'dist_week', 'threshold': 42.2, 'count_mode': True},
+    {'key': 'week_100k',    'label': '100 km en una semana',      'emoji': '💪',
+     'desc': '100 km en 7 días consecutivos',
+     'type': 'dist_week', 'threshold': 100,  'count_mode': True},
+
+    # ── Distancia en un mes ───────────────────────────────────────────────────
+    {'key': 'month_50k',    'label': '50 km en un mes',           'emoji': '📅',
+     'desc': '50 km acumulados en un mes natural',
+     'type': 'dist_month', 'threshold': 50,  'count_mode': True},
+    {'key': 'month_marathon','label': 'Maratón en un mes',        'emoji': '🗓️',
+     'desc': '42 km acumulados en un mes',
+     'type': 'dist_month', 'threshold': 42.2,'count_mode': True},
+    {'key': 'month_100k',   'label': '100 km en un mes',          'emoji': '🌍',
+     'desc': '100 km en un mes natural',
+     'type': 'dist_month', 'threshold': 100, 'count_mode': True},
+    {'key': 'month_200k',   'label': '200 km en un mes',          'emoji': '🚀',
+     'desc': '200 km en un mes natural',
+     'type': 'dist_month', 'threshold': 200, 'count_mode': True},
+
+    # ── Distancia en un año ───────────────────────────────────────────────────
+    {'key': 'year_500k',    'label': '500 km en un año',          'emoji': '🏅',
+     'desc': '500 km acumulados en un año natural',
+     'type': 'dist_year', 'threshold': 500,  'count_mode': True},
+    {'key': 'year_1000k',   'label': '1.000 km en un año',        'emoji': '🥈',
+     'desc': '1.000 km en un año natural',
+     'type': 'dist_year', 'threshold': 1000, 'count_mode': True},
+    {'key': 'year_camino',  'label': 'El Camino de Santiago',     'emoji': '🛤️',
+     'desc': '800 km en un año (la distancia del Camino Francés)',
+     'type': 'dist_year', 'threshold': 800,  'count_mode': True},
+    {'key': 'year_2000k',   'label': '2.000 km en un año',        'emoji': '🥇',
+     'desc': '2.000 km en un año natural',
+     'type': 'dist_year', 'threshold': 2000, 'count_mode': True},
+
+    # ── Logros especiales (distancia acumulada total) ─────────────────────────
+    {'key': 'special_moon',    'label': 'Hasta la Luna',          'emoji': '🌙',
+     'desc': 'Acumular 384.400 km andados (distancia Tierra-Luna)',
+     'type': 'dist_total', 'threshold': 384400, 'count_mode': False},
+    {'key': 'special_world',   'label': 'Vuelta al Mundo',        'emoji': '🌍',
+     'desc': 'Acumular 40.075 km andados (circunferencia de la Tierra)',
+     'type': 'dist_total', 'threshold': 40075,  'count_mode': False},
+    {'key': 'special_equator', 'label': 'Al Ecuador',             'emoji': '🌐',
+     'desc': 'Acumular 10.000 km andados',
+     'type': 'dist_total', 'threshold': 10000,  'count_mode': False},
+    {'key': 'special_spain',   'label': 'España de punta a punta','emoji': '🇪🇸',
+     'desc': 'Acumular 1.200 km (de Tarifa a los Pirineos)',
+     'type': 'dist_total', 'threshold': 1200,   'count_mode': False},
+    {'key': 'special_santiago', 'label': 'El Camino de Santiago', 'emoji': '⛪', 'desc': 'Acumular 800 km andados en total',
+     'type': 'dist_total', 'threshold': 800,    'count_mode': False},
 
     # ── Semanas/mes/año perfecto ──────────────────────────────────────────────
     {'key': 'week_steps',  'label': 'Semana perfecta andando',    'emoji': '📅',
@@ -67,6 +111,12 @@ ACHIEVEMENTS_DEF = [
     {'key': 'day_30k',     'label': '30.000 pasos en un día',     'emoji': '🌟',
      'desc': 'Superar 30.000 pasos en un solo día',
      'type': 'steps_day', 'threshold': 30_000,  'count_mode': True},
+    {'key': 'day_40k',     'label': '40.000 pasos en un día',     'emoji': '🔥',
+     'desc': 'Superar 40.000 pasos en un solo día',
+     'type': 'steps_day', 'threshold': 40_000,  'count_mode': True},
+    {'key': 'day_50k',     'label': '50.000 pasos en un día',     'emoji': '👑',
+     'desc': 'Superar 50.000 pasos en un solo día',
+     'type': 'steps_day', 'threshold': 50_000,  'count_mode': True},
 
     # ── Entrenamientos ────────────────────────────────────────────────────────
     {'key': 'workout_10',  'label': '10 entrenamientos',          'emoji': '🥉',
@@ -83,6 +133,10 @@ ACHIEVEMENTS_DEF = [
      'type': 'workouts_total', 'threshold': 500, 'count_mode': False},
 
     # ── Pasos acumulados totales ──────────────────────────────────────────────
+    {'key': 'km_1000',     'label': '1.000 km andados',           'emoji': '🗺️',
+     'desc': 'Acumular 1.000 km caminando y corriendo en total',
+     'type': 'dist_total', 'threshold': 1000, 'count_mode': False},
+
     {'key': 'total_1k',    'label': '1.000 pasos',                'emoji': '👣',
      'desc': 'Acumular 1.000 pasos en total',
      'type': 'steps_total', 'threshold': 1_000,       'count_mode': False},
@@ -243,10 +297,57 @@ def compute_achievements() -> list:
 
     total_steps = sum(v for v in steps_by_day.values())
 
+    # Distancia total y por día (para ventanas temporales)
+    with get_conn() as conn:
+        dist_rows = conn.execute(
+            "SELECT date_day, value, unit FROM records "
+            "WHERE type='HKQuantityTypeIdentifierDistanceWalkingRunning' "
+            "AND value IS NOT NULL ORDER BY date_day"
+        ).fetchall()
+    dist_by_day2 = defaultdict(float)
+    for r in dist_rows:
+        if r['date_day']:
+            v = float(r['value'] or 0)
+            u = (r['unit'] or '').lower()
+            km = v if u in ('km','kilometer','kilometers') else v/1000
+            dist_by_day2[r['date_day']] += km
+    total_dist_km = sum(dist_by_day2.values())
+
     # Entrenamientos
     from services.workout import list_workouts
-    wk_list     = list_workouts()
-    total_wk    = len(wk_list)
+    wk_list  = list_workouts()
+    total_wk = len(wk_list)
+
+    # Distancia máxima en ventana de 7 días / mes / año
+    sorted_days = sorted(d for d in dist_by_day2.keys() if d)
+
+
+    def _max_dist_window(window):
+        best = 0.0; best_date = None
+        for i, d in enumerate(sorted_days):
+            start = datetime.strptime(d, '%Y-%m-%d')
+            end   = start + timedelta(days=window)
+            total = sum(dist_by_day2.get(d2, 0) for d2 in sorted_days[i:]
+                        if datetime.strptime(d2,'%Y-%m-%d') < end)
+            if total > best:
+                best = total; best_date = d
+        return round(best, 2), best_date
+
+    def _dist_by_period(fmt):
+        by_p = defaultdict(float)
+        for d, v in dist_by_day2.items():
+            if d:
+                try: by_p[datetime.strptime(d,'%Y-%m-%d').strftime(fmt)] += v
+                except: pass
+        return by_p
+
+    max_week_dist,  max_week_date  = _max_dist_window(7)
+    month_dist_map = _dist_by_period('%Y-%m')
+    year_dist_map  = _dist_by_period('%Y')
+    best_month_dist  = max(month_dist_map.values(), default=0)
+    best_month_date  = max(month_dist_map, key=month_dist_map.get, default=None)
+    best_year_dist   = max(year_dist_map.values(), default=0)
+    best_year_date   = max(year_dist_map, key=year_dist_map.get, default=None)
 
     # Día que completó todos los anillos
     all_days = sorted(set(steps_by_day) | set(cal_by_day) | set(stand_by_day))
@@ -313,6 +414,16 @@ def compute_achievements() -> list:
         'steps_day_20k':     _days_above_steps(20_000),
         'steps_day_30k':     _days_above_steps(30_000),
         'workouts_total':    (total_wk, wk_list[-1].get('date') if wk_list else None),
+        'dist_total_1000':   (1 if total_dist_km >= 1000 else 0,
+                              today if total_dist_km >= 1000 else None),
+        'dist_week':         (max_week_dist,  max_week_date),
+        'dist_month':        (best_month_dist, best_month_date),
+        'dist_year':         (best_year_dist,  best_year_date),
+        'dist_total_800':    (1 if total_dist_km >= 800 else 0,   today if total_dist_km >= 800 else None),
+        'dist_total_1200':   (1 if total_dist_km >= 1200 else 0,  today if total_dist_km >= 1200 else None),
+        'dist_total_10000':  (1 if total_dist_km >= 10000 else 0, today if total_dist_km >= 10000 else None),
+        'dist_total_40075':  (1 if total_dist_km >= 40075 else 0, today if total_dist_km >= 40075 else None),
+        'dist_total_384400': (1 if total_dist_km >= 384400 else 0,today if total_dist_km >= 384400 else None),
         'steps_total_1k':    (1 if total_steps >= 1_000 else 0,      today if total_steps >= 1_000 else None),
         'steps_total_100k':  (1 if total_steps >= 100_000 else 0,    today if total_steps >= 100_000 else None),
         'steps_total_1M':    (1 if total_steps >= 1_000_000 else 0,  today if total_steps >= 1_000_000 else None),
@@ -359,6 +470,19 @@ def compute_achievements() -> list:
             key = f'steps_total_{_fmt_threshold(threshold)}'
             met, last = stats.get(key, (0, None))
             return bool(met), int(total_steps), last
+        elif ach_type == 'dist_total':
+            key = f'dist_total_{int(threshold)}'
+            met, last = stats.get(key, (0, None))
+            return bool(met), round(total_dist_km, 1), last
+        elif ach_type == 'dist_week':
+            dist, last = stats.get('dist_week', (0, None))
+            return dist >= threshold, round(dist, 1), last
+        elif ach_type == 'dist_month':
+            dist, last = stats.get('dist_month', (0, None))
+            return dist >= threshold, round(dist, 1), last
+        elif ach_type == 'dist_year':
+            dist, last = stats.get('dist_year', (0, None))
+            return dist >= threshold, round(dist, 1), last
         return False, 0, None
 
     def _fmt_threshold(t):
@@ -474,3 +598,63 @@ def get_challenge_progress(month=None):
             pct = min(100, round(val / float(c['target']) * 100, 1)) if c['target'] else 0
             result.append({**dict(c), 'current': round(val,1), 'pct': pct, 'done': pct >= 100})
     return result
+
+
+def get_global_stats() -> dict:
+    """Estadísticas globales de toda la vida del usuario."""
+    if not DB_FILE.exists():
+        return {}
+    with get_conn() as conn:
+        def _sum(hk_type):
+            r = conn.execute(f"SELECT SUM(value) FROM records WHERE type=?", (hk_type,)).fetchone()
+            return float(r[0] or 0)
+        def _sum_km():
+            rows = conn.execute(
+                "SELECT value, unit FROM records WHERE type='HKQuantityTypeIdentifierDistanceWalkingRunning' AND value IS NOT NULL"
+            ).fetchall()
+            return sum(float(r['value'] or 0) if (r['unit'] or '').lower() in ('km','kilometer','kilometers') else float(r['value'] or 0)/1000 for r in rows)
+        def _sleep_h():
+            rows = conn.execute(
+                "SELECT SUM(CAST((julianday(substr(end_date,1,19))-julianday(substr(start_date,1,19)))*60 AS INTEGER)) as v "
+                "FROM records WHERE type='HKCategoryTypeIdentifierSleepAnalysis' "
+                "AND value_str NOT LIKE '%InBed%' AND value_str NOT LIKE '%Awake%'"
+            ).fetchone()
+            return round(float(rows[0] or 0) / 60, 1)  # minutos → horas
+        def _weight_range():
+            r = conn.execute(
+                "SELECT MIN(value), MAX(value) FROM records WHERE type='HKQuantityTypeIdentifierBodyMass' AND value > 0"
+            ).fetchone()
+            return round(float(r[0] or 0), 1), round(float(r[1] or 0), 1)
+        def _workout_hours():
+            r = conn.execute(
+                "SELECT SUM(value) FROM records WHERE type='HKQuantityTypeIdentifierAppleExerciseTime'"
+            ).fetchone()
+            return round(float(r[0] or 0) / 60, 1)
+
+        total_steps = int(_sum('HKQuantityTypeIdentifierStepCount'))
+        total_dist  = round(_sum_km(), 1)
+        total_floors= int(_sum('HKQuantityTypeIdentifierFlightsClimbed'))
+        total_cal   = int(_sum('HKQuantityTypeIdentifierActiveEnergyBurned'))
+        total_sleep = _sleep_h()
+        w_min, w_max= _weight_range()
+        total_ex_h  = _workout_hours()
+        n_days      = conn.execute("SELECT COUNT(DISTINCT date_day) FROM records WHERE date_day!=''").fetchone()[0]
+
+    from services.workout import list_workouts
+    wk_list = list_workouts()
+    total_wk = len(wk_list)
+    total_wk_km = round(sum(float(w.get('distance_km') or 0) for w in wk_list), 1)
+
+    return {
+        'total_steps':   total_steps,
+        'total_dist_km': total_dist,
+        'total_floors':  total_floors,
+        'total_cal':     total_cal,
+        'total_sleep_h': total_sleep,
+        'weight_min':    w_min,
+        'weight_max':    w_max,
+        'total_ex_h':    total_ex_h,
+        'total_workouts': total_wk,
+        'total_wk_km':   total_wk_km,
+        'days_with_data': n_days,
+    }

@@ -80,7 +80,11 @@
     <div class="extra-section-body open" id="sec-respiracion">
       <div class="es-metric-grid">
         <div class="es-metric-card" title="Respiraciones por minuto. Normal en adultos: 12–20 rpm."><div class="es-mc-top"><span class="es-mc-icon">🌬️</span><span class="es-mc-label">Frecuencia respiratoria</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-resp">—</span><span class="es-mc-unit">rpm</span><span class="mrow-range" id="m-resp-range"></span></div></div>
-        <div class="es-metric-card" title="Perturbaciones respiratorias durante el sueño. Un valor alto puede indicar apnea."><div class="es-mc-top"><span class="es-mc-icon">😴</span><span class="es-mc-label">Alteraciones resp.</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-alter-resp">—</span><span class="es-mc-unit">/h</span></div></div>
+        <div class="es-metric-card" title="Alteraciones respiratorias por hora durante el sueño. Valores > 5 pueden indicar apnea.">
+          <div class="es-mc-top"><span class="es-mc-icon">😮‍💨</span><span class="es-mc-label">Alt. resp. sueño</span></div>
+          <div class="es-mc-value"><span class="es-mc-num" id="m-alter-resp">—</span><span class="es-mc-unit">/h</span></div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-top:2px" id="m-alter-resp-level"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -128,6 +132,17 @@
         <div class="es-metric-card" title="Tiempo total dormido anoche."><div class="es-mc-top"><span class="es-mc-icon">⏱️</span><span class="es-mc-label">Duración total</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-total">—</span></div></div>
         <div class="es-metric-card" title="Sueño profundo: la fase más reparadora. Adultos: ~20% del total."><div class="es-mc-top"><span class="es-mc-icon">🟦</span><span class="es-mc-label">Sueño profundo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-deep">—</span></div></div>
         <div class="es-metric-card" title="Sueño REM: consolidación de la memoria. Adultos: ~25% del total."><div class="es-mc-top"><span class="es-mc-icon">🟣</span><span class="es-mc-label">Sueño REM</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-sleep-rem">—</span></div></div>
+        <div class="es-metric-card" id="temp-muneca-card" title="Temperatura de muñeca durante el sueño (Apple Watch Series 8+). Útil para detectar ciclos y enfermedad.">
+          <div class="es-mc-top"><span class="es-mc-icon">🌡️</span><span class="es-mc-label">Temp. muñeca nocturna</span></div>
+          <div class="es-mc-value">
+            <span class="es-mc-num" id="m-temp-muneca-val">—</span>
+            <span class="es-mc-unit">°C</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-top:3px" id="m-temp-muneca-range"></div>
+          <div id="temp-muneca-chart-wrap" style="display:none;margin-top:8px">
+            <canvas id="temp-muneca-chart" height="50"></canvas>
+          </div>
+        </div>
         <div class="es-metric-card" title="Temperatura de muñeca durante el sueño."><div class="es-mc-top"><span class="es-mc-icon">🌡️</span><span class="es-mc-label">Temp. muñeca</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-temp-muneca">—</span><span class="es-mc-unit">°C</span></div></div>
       </div>
     </div>
@@ -181,9 +196,42 @@
     <div class="extra-section-body open" id="sec-general">
       <div class="es-metric-grid">
         <div class="es-metric-card" title="Minutos de exposición a la luz natural. Recomendado: 30+ min/día para regular el ritmo circadiano."><div class="es-mc-top"><span class="es-mc-icon">☀️</span><span class="es-mc-label">Luz diurna</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-luz">—</span><span class="es-mc-unit">min</span></div></div>
-        <div class="es-metric-card" title="Nivel medio de ruido de auriculares. Por encima de 80 dB de forma sostenida puede dañar el oído."><div class="es-mc-top"><span class="es-mc-icon">🎧</span><span class="es-mc-label">Ruido auriculares</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-auri">—</span><span class="es-mc-unit">dB</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido de auriculares. > 80 dB sostenido puede dañar el oído.">
+          <div class="es-mc-top"><span class="es-mc-icon">🎧</span><span class="es-mc-label">Audio auriculares</span></div>
+          <div class="es-mc-value"><span class="es-mc-num" id="m-ruido-auri">—</span><span class="es-mc-unit">dB</span></div>
+        </div>
+        <div class="es-metric-card" title="Eventos de exposición alta de audio (> 80 dB prolongados).">
+          <div class="es-mc-top"><span class="es-mc-icon">⚠️</span><span class="es-mc-label">Eventos audio alto</span></div>
+          <div class="es-mc-value"><span class="es-mc-num" id="m-eventos-audio">—</span><span class="es-mc-unit">eventos</span></div>
+        </div>
         <div class="es-metric-card" title="Número de lavados de manos detectados por Apple Watch."><div class="es-mc-top"><span class="es-mc-icon">🧼</span><span class="es-mc-label">Lavado de manos</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-lavado-manos">—</span><span class="es-mc-unit">veces</span></div></div>
-        <div class="es-metric-card" title="Nivel medio de ruido ambiental."><div class="es-mc-top"><span class="es-mc-icon">🔊</span><span class="es-mc-label">Ruido ambiental</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ruido-env">—</span><span class="es-mc-unit">dB</span></div></div>
+        <div class="es-metric-card" title="Nivel medio de ruido ambiental a lo largo del día.">
+          <div class="es-mc-top"><span class="es-mc-icon">🔊</span><span class="es-mc-label">Ruido ambiental</span></div>
+          <div class="es-mc-value"><span class="es-mc-num" id="m-ruido-env">—</span><span class="es-mc-unit">dB</span></div>
+        </div>
+        <div class="es-metric-card" title="Minutos de mindfulness y respiración consciente del día.">
+          <div class="es-mc-top"><span class="es-mc-icon">🧘</span><span class="es-mc-label">Mindfulness</span></div>
+          <div class="es-mc-value"><span class="es-mc-num" id="m-mindful-min">—</span><span class="es-mc-unit">min</span></div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-top:2px" id="m-mindful-sessions"></div>
+        </div>
+      </div>
+      {# Gráfica de ruido ambiental #}
+      <div class="section-chart-block" id="noise-env-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">🔊 Ruido ambiental a lo largo del día</span>
+          <span class="section-chart-sub" id="noise-env-sub"></span>
+        </div>
+        <div class="section-chart-wrap"><canvas id="noise-env-canvas"></canvas></div>
+        <div class="section-chart-xaxis" id="noise-env-xaxis"></div>
+      </div>
+      {# Gráfica de auriculares #}
+      <div class="section-chart-block" id="noise-auri-block" style="display:none">
+        <div class="section-chart-header">
+          <span class="section-chart-title">🎧 Audio auriculares a lo largo del día</span>
+          <span class="section-chart-sub" id="noise-auri-sub"></span>
+        </div>
+        <div class="section-chart-wrap"><canvas id="noise-auri-canvas"></canvas></div>
+        <div class="section-chart-xaxis" id="noise-auri-xaxis"></div>
       </div>
     </div>
   </div>
@@ -197,21 +245,6 @@
     <div class="extra-section-body open" id="sec-nutricion">
       <div class="es-metric-grid">
         <div class="es-metric-card" title="Agua consumida. Registrada manualmente o con apps de hidratación. Recomendación: 2.000–2.500 mL/día."><div class="es-mc-top"><span class="es-mc-icon">💧</span><span class="es-mc-label">Agua</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-agua">—</span><span class="es-mc-unit">mL</span></div></div>
-      </div>
-    </div>
-  </div>
-
-  {# ── ÁNIMO ── #}
-  <div class="extra-section">
-    <button class="extra-section-btn" onclick="toggleSection('sec-animo')">
-      <div class="extra-section-left"><span class="extra-section-icon">🧠</span><span class="extra-section-title">Ánimo y bienestar</span></div>
-      <svg class="extra-chevron" id="chev-sec-animo" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-    <div class="extra-section-body open" id="sec-animo">
-      <div class="es-metric-grid">
-        <div class="es-metric-card" title="Estado de ánimo registrado manualmente en la app Salud (iOS 17+). Escala 1–5."><div class="es-mc-top"><span class="es-mc-icon">😊</span><span class="es-mc-label">Estado de ánimo</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-estado-animo">—</span><span class="es-mc-unit">/ 5</span></div></div>
-        <div class="es-metric-card" title="Indicador de riesgo de ansiedad generalizada (GAD). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😰</span><span class="es-mc-label">Riesgo ansiedad</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-ansiedad">—</span></div></div>
-        <div class="es-metric-card" title="Indicador de riesgo de depresión (PHQ). Requiere registro en app Salud (iOS 17+)."><div class="es-mc-top"><span class="es-mc-icon">😔</span><span class="es-mc-label">Riesgo depresión</span></div><div class="es-mc-value"><span class="es-mc-num" id="m-depresion">—</span></div></div>
       </div>
     </div>
   </div>

@@ -3,170 +3,112 @@
 
 {% block extra_css %}
 <style>
-.lg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-@media(max-width:640px){ .lg-grid { grid-template-columns:1fr; } }
-
-/* Rachas */
-.streak-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:14px; padding:18px 20px; display:flex;
-  align-items:center; gap:16px;
+/* ── Stats globales ─────────────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px; margin-bottom: 28px;
 }
-.streak-emoji { font-size:2rem; flex-shrink:0; }
-.streak-info { flex:1; }
-.streak-label { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-family:var(--font-mono); }
-.streak-current { font-size:2rem; font-weight:800; letter-spacing:-.04em; line-height:1; margin:3px 0; }
-.streak-best { font-size:11px; color:var(--muted); font-family:var(--font-mono); }
-.streak-bar-track { height:5px; background:var(--border); border-radius:3px; margin-top:8px; overflow:hidden; }
-.streak-bar-fill  { height:100%; border-radius:3px; transition:width 1s ease; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; text-align: center;
+}
+.stat-val  { font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
+.stat-key  { font-size: 9px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-family: var(--font-mono); margin-top: 4px; }
 
-/* Logros */
-.ach-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+/* ── Logros ─────────────────────────────────────────────────────────────────── */
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .ach-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:12px; padding:14px 16px; transition:all .2s;
-  position:relative; overflow:hidden;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden;
+  transition: all .2s;
 }
-.ach-card.unlocked { border-color: #f59e0b; background: linear-gradient(135deg, #fffbeb, var(--surface)); }
-.ach-card.locked   { opacity:.5; filter:grayscale(.8); }
+.ach-card.unlocked { border-color: #f59e0b; background: linear-gradient(135deg,#fffbeb,var(--surface)); }
+.ach-card.locked   { opacity: .45; filter: grayscale(.7); }
+.ach-badge { position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:10px;color:white; }
+.ach-count { position:absolute;top:8px;left:8px;background:#1a3fa8;color:white;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:99px; }
 .ach-emoji { font-size:1.6rem; margin-bottom:6px; }
-.ach-label { font-size:12px; font-weight:600; margin-bottom:3px; }
+.ach-label { font-size:12px; font-weight:600; margin-bottom:3px; line-height:1.3; }
 .ach-desc  { font-size:10px; color:var(--muted); font-family:var(--font-mono); line-height:1.4; }
-.ach-date  { font-size:9px; color:#f59e0b; font-family:var(--font-mono); margin-top:6px; font-weight:600; }
-.ach-count-badge {
-  position:absolute; top:8px; left:8px;
-  background:#1a3fa8; color:white;
-  font-size:9px; font-family:var(--font-mono);
-  font-weight:700; padding:2px 6px; border-radius:99px;
-}
-.ach-badge {
-  position:absolute; top:8px; right:8px;
-  width:16px; height:16px; border-radius:50%;
-  background:#f59e0b; display:flex; align-items:center; justify-content:center;
-  font-size:9px;
-}
+.ach-date  { font-size:9px; color:#f59e0b; font-family:var(--font-mono); margin-top:5px; font-weight:600; }
+.ach-prog  { font-size:9px; color:var(--dim); font-family:var(--font-mono); margin-top:4px; }
 
-/* Retos */
-.reto-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:14px; padding:18px 20px; margin-bottom:10px;
-}
-.reto-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.reto-label  { font-size:13px; font-weight:600; }
-.reto-pct    { font-size:12px; font-family:var(--font-mono); color:var(--muted); }
-.reto-track  { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
-.reto-fill   { height:100%; border-radius:4px; transition:width 1.2s ease; }
-.reto-sub    { font-size:11px; color:var(--muted); font-family:var(--font-mono); margin-top:5px; }
-.reto-done   { color:#1a8a4a; font-weight:700; }
-
-/* Modal nuevo reto */
-.modal-backdrop {
-  position:fixed; inset:0; background:rgba(0,0,0,.4);
-  display:flex; align-items:center; justify-content:center; z-index:9000;
-  display:none;
-}
-.modal-card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:16px; padding:24px; width:90%; max-width:420px;
-  max-height:90vh; overflow-y:auto;
-}
-.modal-title { font-size:1rem; font-weight:700; margin-bottom:16px; }
-.modal-field { margin-bottom:12px; }
-.modal-label { display:block; font-size:11px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:5px; }
-.modal-input { width:100%; height:36px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:13px; color:var(--text); outline:none; }
-.modal-input:focus { border-color:var(--text); }
-.modal-select { width:100%; height:36px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:13px; color:var(--text); }
-.modal-btns { display:flex; gap:8px; margin-top:16px; }
-.modal-btn { flex:1; height:36px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
-.modal-btn.primary { background:var(--text); color:var(--bg); }
-.modal-btn.secondary { background:var(--border); color:var(--muted); }
-
-.section-title {
+.ach-section-title {
   font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
   color:var(--muted); font-family:var(--font-mono);
-  padding-bottom:8px; border-bottom:2px solid var(--border); margin-bottom:14px;
+  padding-bottom:8px; border-bottom:2px solid var(--border); margin:20px 0 12px;
 }
-.page-title { font-size:1.1rem; font-weight:700; letter-spacing:-.02em; margin-bottom:24px; }
+
+/* ── Retos ──────────────────────────────────────────────────────────────────── */
+.reto-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px; margin-bottom: 10px;
+  position: relative;
+}
+.reto-header  { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.reto-label   { font-size:13px; font-weight:600; }
+.reto-pct     { font-size:12px; font-family:var(--font-mono); color:var(--muted); }
+.reto-track   { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.reto-fill    { height:100%; border-radius:4px; transition:width 1.2s ease; }
+.reto-sub     { font-size:11px; color:var(--muted); font-family:var(--font-mono); margin-top:5px; }
+.reto-done    { color:#1a8a4a; font-weight:700; }
+.reto-actions { position:absolute; top:10px; right:10px; display:flex; gap:4px; }
+.reto-btn     { width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--muted); }
+.reto-btn:hover { border-color:var(--text);color:var(--text); }
+
+/* ── Modales ────────────────────────────────────────────────────────────────── */
+.modal-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:9000; }
+.modal-backdrop.open { display:flex; }
+.modal-card { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:90%;max-width:420px;max-height:90vh;overflow-y:auto; }
+.modal-title { font-size:1rem;font-weight:700;margin-bottom:16px; }
+.modal-field { margin-bottom:12px; }
+.modal-label { display:block;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px; }
+.modal-input  { width:100%;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;color:var(--text);outline:none; }
+.modal-input:focus { border-color:var(--text); }
+.modal-select { width:100%;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;color:var(--text); }
+.modal-btns { display:flex;gap:8px;margin-top:16px; }
+.modal-btn  { flex:1;height:36px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer; }
+.modal-btn.primary   { background:var(--text);color:var(--bg); }
+.modal-btn.secondary { background:var(--border);color:var(--muted); }
+
+.section-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-family:var(--font-mono);padding-bottom:8px;border-bottom:2px solid var(--border);margin-bottom:14px; }
+.page-hdr { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
+.page-title { font-size:1.1rem;font-weight:700;letter-spacing:-.02em; }
+.btn-new { font-size:12px;font-family:var(--font-mono);border:1px solid var(--border);border-radius:8px;padding:5px 12px;background:var(--surface);cursor:pointer;color:var(--muted);transition:all .15s; }
+.btn-new:hover { border-color:var(--text);color:var(--text); }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
-  <h2 class="page-title" style="margin-bottom:0">Logros y retos</h2>
+<div class="page-hdr">
+  <h2 class="page-title">Logros y retos</h2>
 </div>
 
-{# ── RACHAS ────────────────────────────────────────────────────────────────── #}
-<div class="section-title">🔥 Rachas activas</div>
-<div class="lg-grid" id="streaks-wrap" style="margin-bottom:28px">
-  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1;padding:20px 0">Calculando rachas…</div>
+{# ── ESTADÍSTICAS GLOBALES ──────────────────────────────────────────────────── #}
+<div class="section-title">📊 Estadísticas de toda la vida</div>
+<div class="stats-grid" id="stats-wrap">
+  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1">Calculando…</div>
 </div>
 
 {# ── RETOS DEL MES ─────────────────────────────────────────────────────────── #}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-  <div class="section-title" style="margin-bottom:0;border-bottom:none">🎯 Retos de {{ today[:7] }}</div>
-  <button onclick="openModal()" style="font-size:12px;font-family:var(--font-mono);border:1px solid var(--border);border-radius:8px;padding:5px 12px;background:var(--surface);cursor:pointer;color:var(--muted)">+ Nuevo reto</button>
+<div class="page-hdr" style="margin-bottom:14px">
+  <div class="section-title" style="margin-bottom:0;border-bottom:none">🎯 Retos del mes</div>
+  <button class="btn-new" onclick="openModal()">+ Nuevo reto</button>
 </div>
 <div id="retos-wrap" style="margin-bottom:28px">
-  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:20px 0">Cargando retos…</div>
+  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px">Cargando…</div>
 </div>
 
 {# ── LOGROS ────────────────────────────────────────────────────────────────── #}
 <div class="section-title">🏆 Logros</div>
-<div class="ach-grid" id="ach-wrap">
-  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1;padding:20px 0">Calculando logros…</div>
+<div id="ach-wrap">
+  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:20px 0">Calculando…</div>
 </div>
 
-{# ── LOGROS PERSONALIZADOS ──────────────────────────────────────────────────── #}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;margin-top:28px">
-  <div class="section-title" style="margin-bottom:0;border-bottom:none">⭐ Logros personalizados</div>
-  <button onclick="openCustomModal()" style="font-size:12px;font-family:var(--font-mono);border:1px solid var(--border);border-radius:8px;padding:5px 12px;background:var(--surface);cursor:pointer;color:var(--muted)">+ Crear logro</button>
-</div>
-<div class="ach-grid" id="custom-ach-wrap" style="margin-bottom:28px">
-  <div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1;padding:20px 0">Cargando…</div>
-</div>
-
-{# Modal logro personalizado #}
-<div class="modal-backdrop" id="custom-modal">
-  <div class="modal-card">
-    <div class="modal-title">Nuevo logro personalizado</div>
-    <div style="display:flex;gap:10px">
-      <div class="modal-field" style="flex:0 0 70px">
-        <label class="modal-label">Emoji</label>
-        <input class="modal-input" type="text" id="c-emoji" value="🎯" maxlength="2" style="text-align:center;font-size:1.4rem">
-      </div>
-      <div class="modal-field" style="flex:1">
-        <label class="modal-label">Nombre del logro</label>
-        <input class="modal-input" type="text" id="c-label" placeholder="Ej: Primer 5k en 30 min">
-      </div>
-    </div>
-    <div class="modal-field">
-      <label class="modal-label">Descripción (opcional)</label>
-      <input class="modal-input" type="text" id="c-desc" placeholder="Ej: Corrí 5 km en menos de 30 minutos">
-    </div>
-    <div class="modal-field">
-      <label class="modal-label">¿Cómo se desbloquea?</label>
-      <select class="modal-select" id="c-type">
-        <option value="manual">Manual — lo marco yo cuando quiera</option>
-        <option value="steps">Al superar X pasos en un día</option>
-        <option value="sleep_h">Al dormir X horas en una noche</option>
-        <option value="workout_km">Al recorrer X km en un entrenamiento</option>
-      </select>
-    </div>
-    <div class="modal-field" id="c-target-wrap" style="display:none">
-      <label class="modal-label" id="c-target-label">Valor objetivo</label>
-      <input class="modal-input" type="number" id="c-target" placeholder="Ej: 25000" min="0">
-    </div>
-    <div class="modal-btns">
-      <button class="modal-btn secondary" onclick="closeCustomModal()">Cancelar</button>
-      <button class="modal-btn primary" onclick="saveCustomAch()">Crear logro</button>
-    </div>
-  </div>
-</div>
-
-{# Modal nuevo reto #}
+{# Modal nuevo/editar reto #}
 <div class="modal-backdrop" id="modal">
   <div class="modal-card">
-    <div class="modal-title">Nuevo reto mensual</div>
+    <div class="modal-title" id="modal-title">Nuevo reto mensual</div>
+    <input type="hidden" id="reto-edit-id" value="">
     <div class="modal-field">
       <label class="modal-label">Tipo de reto</label>
       <select class="modal-select" id="reto-type" onchange="updateRetoUnit()">
@@ -183,7 +125,7 @@
     </div>
     <div class="modal-btns">
       <button class="modal-btn secondary" onclick="closeModal()">Cancelar</button>
-      <button class="modal-btn primary" onclick="saveReto()">Guardar reto</button>
+      <button class="modal-btn primary" onclick="saveReto()">Guardar</button>
     </div>
   </div>
 </div>
@@ -192,222 +134,188 @@
 {% block extra_js %}
 <script>
 const MONTH = '{{ today }}';
-const STREAK_COLORS = {
-  steps_7k:  '#ff3b5c',
-  steps_10k: '#ff9500',
-  sleep_7h:  '#1a3fa8',
-  active:    '#34c759',
-};
-const STREAK_LABELS = {
-  steps_7k:  {label:'Pasos > 7.000',  emoji:'👟', unit:'días',   goal:30},
-  steps_10k: {label:'Pasos > 10.000', emoji:'🔥', unit:'días',   goal:30},
-  sleep_7h:  {label:'Sueño > 7h',     emoji:'🌙', unit:'noches', goal:14},
-  active:    {label:'Días activo',     emoji:'⚡', unit:'días',   goal:60},
-};
-const RETO_UNITS = {
-  distance:    'km este mes',
-  steps:       'pasos este mes',
-  calories:    'kcal este mes',
-  sleep_nights:'noches con > 7h',
-  workouts:    'entrenamientos',
-};
-const RETO_LABELS = {
-  distance:    'Distancia', steps:'Pasos', calories:'Calorías',
-  sleep_nights:'Noches de buen sueño', workouts:'Entrenamientos',
-};
-const RETO_COLORS = {
-  distance:'#34c759', steps:'#ff3b5c', calories:'#ff9500',
-  sleep_nights:'#1a3fa8', workouts:'#a78bfa',
+const RETO_UNITS   = {distance:'km',steps:'pasos',calories:'kcal',sleep_nights:'noches',workouts:'entrenamientos'};
+const RETO_LABELS  = {distance:'Distancia',steps:'Pasos',calories:'Calorías',sleep_nights:'Noches sueño',workouts:'Entrenamientos'};
+const RETO_COLORS  = {distance:'#34c759',steps:'#ff3b5c',calories:'#ff9500',sleep_nights:'#1a3fa8',workouts:'#a78bfa'};
+const ACH_SECTIONS = [
+  {id:'move',  label:'🏃 Actividad y movimiento'},
+  {id:'dist_week',  label:'📅 Distancia semanal'},
+  {id:'dist_month', label:'🗓️ Distancia mensual'},
+  {id:'dist_year',  label:'📆 Distancia anual'},
+  {id:'special',    label:'🌍 Logros especiales'},
+  {id:'steps_day',  label:'👟 Pasos en un día'},
+  {id:'steps_total',label:'👣 Pasos acumulados'},
+  {id:'workouts',   label:'🏋️ Entrenamientos'},
+];
+const ACH_SECTION_MAP = {
+  move_goal_500:'move', move_200pct:'move', move_300pct:'move', move_400pct:'move',
+  kcal_500:'move', week_steps:'move', week_stand:'move', month_steps:'move', year_steps:'move',
+  week_5k:'dist_week', week_marathon:'dist_week', week_100k:'dist_week',
+  month_50k:'dist_month', month_marathon:'dist_month', month_100k:'dist_month', month_200k:'dist_month',
+  year_500k:'dist_year', year_1000k:'dist_year', year_camino:'dist_year', year_2000k:'dist_year',
+  special_moon:'special', special_world:'special', special_equator:'special',
+  special_spain:'special', special_santiago:'special', km_1000:'special',
+  day_10k:'steps_day', day_20k:'steps_day', day_30k:'steps_day', day_40k:'steps_day', day_50k:'steps_day',
+  total_1k:'steps_total', total_100k:'steps_total', total_1M:'steps_total',
+  total_5M:'steps_total', total_10M:'steps_total', total_50M:'steps_total',
+  workout_10:'workouts', workout_50:'workouts', workout_100:'workouts', workout_500:'workouts',
 };
 
-// ── Rachas ───────────────────────────────────────────────────────────────────
-async function loadStreaks() {
-  const r = await fetch('/api/gamification/streaks');
+// ── Estadísticas globales ─────────────────────────────────────────────────────
+async function loadStats() {
+  const r = await fetch('/api/gamification/stats');
   const d = await r.json();
-  const wrap = document.getElementById('streaks-wrap');
-  if (!Object.keys(d).length) {
-    wrap.innerHTML = '<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1">Sin datos suficientes</div>';
-    return;
-  }
-  wrap.innerHTML = Object.entries(d).map(([key, s]) => {
-    const def   = STREAK_LABELS[key] || {label:key, emoji:'📊', unit:'días', goal:30};
-    const color = STREAK_COLORS[key] || '#6366f1';
-    const pct   = Math.min(100, Math.round(s.current / def.goal * 100));
-    return `<div class="streak-card">
-      <div class="streak-emoji">${def.emoji}</div>
-      <div class="streak-info">
-        <div class="streak-label">${def.label}</div>
-        <div class="streak-current" style="color:${color}">${s.current} <span style="font-size:12px;font-weight:400;color:var(--muted)">${def.unit}</span></div>
-        <div class="streak-best">Récord: ${s.best} ${def.unit}</div>
-        <div class="streak-bar-track">
-          <div class="streak-bar-fill" style="width:${pct}%;background:${color}"></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  const wrap = document.getElementById('stats-wrap');
+  if (!Object.keys(d).length) { wrap.innerHTML='<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1">Sin datos</div>'; return; }
+  const fmt = n => Math.round(n||0).toLocaleString('es-ES');
+  const items = [
+    {val: fmt(d.total_steps),                     key: 'Pasos totales'},
+    {val: fmt(d.total_dist_km) + ' km',           key: 'Distancia total'},
+    {val: fmt(d.total_floors),                     key: 'Pisos subidos'},
+    {val: fmt(d.total_cal) + ' kcal',             key: 'Calorías quemadas'},
+    {val: fmt(d.total_sleep_h) + ' h',            key: 'Horas durmiendo'},
+    {val: fmt(d.total_ex_h) + ' h',              key: 'Horas entrenando'},
+    {val: fmt(d.total_workouts),                   key: 'Entrenamientos'},
+    {val: fmt(d.total_wk_km) + ' km',            key: 'Km entrenando'},
+    {val: d.weight_min > 0 ? d.weight_min + ' kg' : '—', key: 'Peso mínimo'},
+    {val: d.weight_max > 0 ? d.weight_max + ' kg' : '—', key: 'Peso máximo'},
+    {val: fmt(d.days_with_data),                   key: 'Días con datos'},
+  ];
+  wrap.innerHTML = items.map(i => `
+    <div class="stat-card">
+      <div class="stat-val">${i.val}</div>
+      <div class="stat-key">${i.key}</div>
+    </div>`).join('');
 }
 
-// ── Logros ───────────────────────────────────────────────────────────────────
+// ── Logros ────────────────────────────────────────────────────────────────────
 async function loadAchievements() {
   const r = await fetch('/api/gamification/achievements');
   const d = await r.json();
   const wrap = document.getElementById('ach-wrap');
-  const unlocked = d.filter(a => a.unlocked);
-  const locked   = d.filter(a => !a.unlocked);
-  const renderAch = (a) => {
-    const countBadge = (a.count != null && a.count > 1)
-      ? `<div class="ach-count-badge">×${a.count.toLocaleString('es-ES')}</div>` : '';
+
+  // Agrupar por sección
+  const groups = {};
+  for (const sec of ACH_SECTIONS) groups[sec.id] = [];
+  for (const a of d) {
+    const sec = ACH_SECTION_MAP[a.key] || 'move';
+    if (!groups[sec]) groups[sec] = [];
+    groups[sec].push(a);
+  }
+
+  const renderAch = a => {
+    const countBadge = (a.count != null && a.count > 0)
+      ? `<div class="ach-count">×${a.count.toLocaleString('es-ES')}</div>` : '';
     return `<div class="ach-card ${a.unlocked ? 'unlocked' : 'locked'}">
       ${a.unlocked ? '<div class="ach-badge">✓</div>' : ''}
       ${countBadge}
       <div class="ach-emoji">${a.emoji}</div>
       <div class="ach-label">${a.label}</div>
       <div class="ach-desc">${a.desc}</div>
-      ${a.unlock_date && a.unlocked ? `<div class="ach-date">🗓️ Último: ${a.unlock_date}</div>` : ''}
-      ${!a.unlocked && a.value > 0 ? `<div class="ach-desc" style="margin-top:4px;color:var(--muted)">Progreso: ${a.value.toLocaleString('es-ES')}</div>` : ''}
+      ${a.unlocked && a.unlock_date ? `<div class="ach-date">🗓️ ${a.unlock_date}</div>` : ''}
+      ${!a.unlocked && a.value > 0 ? `<div class="ach-prog">Progreso: ${typeof a.value === 'number' && a.value > 1000 ? a.value.toLocaleString('es-ES') : a.value}</div>` : ''}
     </div>`;
   };
-  wrap.innerHTML = [...unlocked, ...locked].map(renderAch).join('');
+
+  let html = '';
+  for (const sec of ACH_SECTIONS) {
+    const items = groups[sec.id] || [];
+    if (!items.length) continue;
+    const unlocked = items.filter(a => a.unlocked);
+    const locked   = items.filter(a => !a.unlocked);
+    html += `<div class="ach-section-title">${sec.label} <span style="color:var(--dim);font-size:9px">${unlocked.length}/${items.length}</span></div>`;
+    html += `<div class="ach-grid" style="margin-bottom:8px">${[...unlocked,...locked].map(renderAch).join('')}</div>`;
+  }
+  wrap.innerHTML = html || '<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px">Sin datos</div>';
 }
 
-// ── Retos ────────────────────────────────────────────────────────────────────
+// ── Retos ─────────────────────────────────────────────────────────────────────
 async function loadRetos() {
   const r = await fetch('/api/gamification/challenge?month=' + MONTH);
   const d = await r.json();
   const wrap = document.getElementById('retos-wrap');
   if (!d.progress || !d.progress.length) {
-    wrap.innerHTML = `<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:12px 0">
-      Sin retos este mes. Pulsa "+ Nuevo reto" para añadir uno.
-    </div>`;
+    wrap.innerHTML = `<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px 0">Sin retos este mes. Pulsa "+ Nuevo reto" para añadir uno.</div>`;
     return;
   }
   wrap.innerHTML = d.progress.map(c => {
     const color = RETO_COLORS[c.key] || '#6366f1';
-    const label = RETO_LABELS[c.key] || c.label;
-    const unit  = RETO_UNITS[c.key]  || c.unit;
     return `<div class="reto-card">
+      <div class="reto-actions">
+        <button class="reto-btn" onclick="editReto(${c.id},'${c.key}',${c.target})" title="Editar">✏️</button>
+        <button class="reto-btn" onclick="deleteReto(${c.id})" title="Eliminar">🗑️</button>
+      </div>
       <div class="reto-header">
-        <div class="reto-label">${label} <span style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">${unit}</span></div>
-        <div class="reto-pct ${c.done ? 'reto-done' : ''}">${c.done ? '✓ Completado' : c.pct + '%'}</div>
+        <div class="reto-label">${RETO_LABELS[c.key]||c.key}</div>
+        <div class="reto-pct ${c.done?'reto-done':''}">${c.done?'✓ Completado':c.pct+'%'}</div>
       </div>
       <div class="reto-track">
-        <div class="reto-fill" style="width:${c.pct}%;background:${color}${c.done?'':''};"></div>
+        <div class="reto-fill" style="width:${c.pct}%;background:${color}"></div>
       </div>
-      <div class="reto-sub">${c.current.toLocaleString('es-ES')} de ${parseFloat(c.target).toLocaleString('es-ES')} ${c.unit}</div>
+      <div class="reto-sub">${(c.current||0).toLocaleString('es-ES')} de ${parseFloat(c.target||0).toLocaleString('es-ES')} ${RETO_UNITS[c.key]||c.unit||''}</div>
     </div>`;
   }).join('');
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
-function openModal()  { document.getElementById('modal').style.display='flex'; }
-function closeModal() { document.getElementById('modal').style.display='none'; }
-function updateRetoUnit() {
-  const type = document.getElementById('reto-type').value;
-  document.getElementById('reto-unit-label').textContent = RETO_UNITS[type] || '';
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(id='', type='distance', target='') {
+  document.getElementById('modal-title').textContent = id ? 'Editar reto' : 'Nuevo reto mensual';
+  document.getElementById('reto-edit-id').value = id;
+  document.getElementById('reto-type').value    = type;
+  document.getElementById('reto-target').value  = target;
+  updateRetoUnit();
+  document.getElementById('modal').classList.add('open');
 }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function editReto(id, type, target) { openModal(id, type, target); }
+
 document.getElementById('modal').addEventListener('click', e => {
   if (e.target === document.getElementById('modal')) closeModal();
 });
 
+const RETO_UNIT_LABELS = {
+  distance:'km este mes', steps:'pasos este mes', calories:'kcal este mes',
+  sleep_nights:'noches con > 7h', workouts:'entrenamientos'
+};
+function updateRetoUnit() {
+  const type = document.getElementById('reto-type').value;
+  document.getElementById('reto-unit-label').textContent = RETO_UNIT_LABELS[type] || '';
+}
+
+async function deleteReto(id) {
+  if (!confirm('¿Eliminar este reto?')) return;
+  await fetch(`/api/gamification/challenge/${id}`, {method:'DELETE'});
+  loadRetos();
+}
+
 async function saveReto() {
+  const id     = document.getElementById('reto-edit-id').value;
   const type   = document.getElementById('reto-type').value;
   const target = parseFloat(document.getElementById('reto-target').value);
-  if (!target || target <= 0) return;
-  // Cargar retos existentes para no borrarlos
-  const r    = await fetch('/api/gamification/challenge?month=' + MONTH);
-  const d    = await r.json();
-  const existing = (d.progress || []).map(c => ({key:c.key, target:c.target, unit:c.unit, label:RETO_LABELS[c.key]||c.key}));
-  const newChallenge = {key: type, target, unit: RETO_UNITS[type], label: RETO_LABELS[type]};
-  const merged = [...existing.filter(c => c.key !== type), newChallenge];
-  await fetch('/api/gamification/challenge', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({month: MONTH, challenges: merged})
-  });
+  if (!target || target <= 0) { alert('Introduce un objetivo válido'); return; }
+
+  if (id) {
+    // Editar existente
+    await fetch(`/api/gamification/challenge/${id}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({label: RETO_LABELS[type], target, unit: RETO_UNITS[type]})
+    });
+  } else {
+    // Nuevo reto
+    const r = await fetch('/api/gamification/challenge?month=' + MONTH);
+    const d = await r.json();
+    const existing = (d.progress||[]).map(c => ({key:c.key,target:c.target,unit:RETO_UNITS[c.key]||c.unit,label:RETO_LABELS[c.key]||c.key}));
+    const newC = {key:type, target, unit:RETO_UNITS[type], label:RETO_LABELS[type]};
+    await fetch('/api/gamification/challenge', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({month:MONTH, challenges:[...existing.filter(c=>c.key!==type), newC]})
+    });
+  }
   closeModal();
   loadRetos();
 }
 
-// ── Logros personalizados ────────────────────────────────────────────────────
-async function loadCustomAch() {
-  const r = await fetch('/api/gamification/custom-achievements');
-  const d = await r.json();
-  const wrap = document.getElementById('custom-ach-wrap');
-  if (!d.length) {
-    wrap.innerHTML = `<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;grid-column:1/-1;padding:12px 0">
-      Sin logros personalizados. Crea el tuyo con "+ Crear logro".
-    </div>`;
-    return;
-  }
-  wrap.innerHTML = d.map(a => `
-    <div class="ach-card ${a.unlocked ? 'unlocked' : ''}" style="position:relative">
-      ${a.unlocked ? '<div class="ach-badge">✓</div>' : ''}
-      <div class="ach-emoji">${a.emoji}</div>
-      <div class="ach-label">${a.label}</div>
-      ${a.desc ? `<div class="ach-desc">${a.desc}</div>` : ''}
-      ${a.unlock_date ? `<div class="ach-date">🗓️ ${a.unlock_date}</div>` : ''}
-      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-        ${!a.unlocked ? `<button onclick="unlockCustomAch(${a.id})"
-          style="font-size:10px;font-family:var(--font-mono);border:1px solid #f59e0b;border-radius:6px;padding:3px 8px;background:#fffbeb;color:#92400e;cursor:pointer">
-          ✓ Marcar conseguido
-        </button>` : ''}
-        <button onclick="deleteCustomAch(${a.id})"
-          style="font-size:10px;font-family:var(--font-mono);border:1px solid var(--border);border-radius:6px;padding:3px 8px;background:none;color:var(--muted);cursor:pointer">
-          🗑️
-        </button>
-      </div>
-    </div>`).join('');
-}
-
-async function unlockCustomAch(id) {
-  await fetch(`/api/gamification/custom-achievements/${id}/unlock`, {method:'POST'});
-  loadCustomAch();
-}
-async function deleteCustomAch(id) {
-  if (!confirm('¿Eliminar este logro?')) return;
-  await fetch(`/api/gamification/custom-achievements/${id}`, {method:'DELETE'});
-  loadCustomAch();
-}
-
-function openCustomModal()  { document.getElementById('custom-modal').style.display='flex'; }
-function closeCustomModal() { document.getElementById('custom-modal').style.display='none'; }
-
-document.getElementById('custom-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('custom-modal')) closeCustomModal();
-});
-
-const TARGET_LABELS = {
-  steps:      'Pasos mínimos en un día',
-  sleep_h:    'Horas de sueño mínimas',
-  workout_km: 'Km mínimos en el entrenamiento',
-};
-document.getElementById('c-type').addEventListener('change', function() {
-  const wrap = document.getElementById('c-target-wrap');
-  const lbl  = document.getElementById('c-target-label');
-  if (this.value === 'manual') {
-    wrap.style.display = 'none';
-  } else {
-    wrap.style.display = 'block';
-    lbl.textContent = TARGET_LABELS[this.value] || 'Valor objetivo';
-  }
-});
-
-async function saveCustomAch() {
-  const emoji = document.getElementById('c-emoji').value.trim() || '🎯';
-  const label = document.getElementById('c-label').value.trim();
-  const desc  = document.getElementById('c-desc').value.trim();
-  const type  = document.getElementById('c-type').value;
-  const target = parseFloat(document.getElementById('c-target').value) || null;
-  if (!label) { alert('El nombre es obligatorio'); return; }
-  const res = await fetch('/api/gamification/custom-achievements', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({emoji, label, desc, target_type:type, target_val:target})
-  });
-  const data = await res.json();
-  if (data.ok) { closeCustomModal(); loadCustomAch(); }
-}
-
-// Cargar todo
-loadStreaks();
+loadStats();
 loadAchievements();
 loadRetos();
 </script>

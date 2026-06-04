@@ -138,6 +138,14 @@
        href="/ajustes?s=creds">
       <span class="sett-nav-icon">🔐</span> Credenciales
     </a>
+    <a class="sett-nav-item {% if section == 'goals' %}active{% endif %}"
+       href="/ajustes?s=goals">
+      <span class="sett-nav-icon">🎯</span> Objetivos
+    </a>
+    <a class="sett-nav-item {% if section == 'export_ai' %}active{% endif %}"
+       href="/ajustes?s=export_ai">
+      <span class="sett-nav-icon">🤖</span> Exportar para IA
+    </a>
     <div class="sett-nav-sep"></div>
     <a class="sett-nav-item {% if section == 'obsidian' %}active{% endif %}"
        href="/ajustes?s=obsidian">
@@ -288,6 +296,109 @@
       </div>
     </div>
 
+    {# ── OBJETIVOS ────────────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'goals' %}active{% endif %}">
+      <div class="sett-page-title">Objetivos diarios</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🎯</span>
+          <div>
+            <div class="sett-card-title">Metas de actividad</div>
+            <div class="sett-card-sub">Usadas para calcular logros, anillos y rachas</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <div class="sett-field">
+            <label class="sett-label">Pasos diarios</label>
+            <input class="sett-input" type="number" id="g-steps"
+                   value="{{ goals.steps_daily | int if goals else 10000 }}"
+                   min="1000" max="50000" step="500">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Calorías activas (kcal)</label>
+            <input class="sett-input" type="number" id="g-calories"
+                   value="{{ goals.calories_daily | int if goals else 500 }}"
+                   min="100" max="2000" step="50">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Minutos de ejercicio</label>
+            <input class="sett-input" type="number" id="g-exercise"
+                   value="{{ goals.exercise_min | int if goals else 30 }}"
+                   min="10" max="120" step="5">
+          </div>
+          <div class="sett-field">
+            <label class="sett-label">Horas de pie</label>
+            <input class="sett-input" type="number" id="g-stand"
+                   value="{{ goals.stand_hours | int if goals else 12 }}"
+                   min="1" max="16" step="1">
+          </div>
+          <button class="sett-btn" onclick="saveGoals()">Guardar objetivos</button>
+          <div class="sett-msg" id="goals-msg"></div>
+
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);
+                      font-size:11px;color:var(--muted);font-family:var(--font-mono);line-height:1.7">
+            Estos valores afectan a:<br>
+            • Los anillos de actividad del dashboard<br>
+            • Los logros de movimiento y anillos completos<br>
+            • Las rachas de días activos<br>
+            • Los retos mensuales
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── EXPORTAR PARA IA ─────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'export_ai' %}active{% endif %}">
+      <div class="sett-page-title">Exportar datos para IA</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🤖</span>
+          <div>
+            <div class="sett-card-title">Análisis con Claude / ChatGPT</div>
+            <div class="sett-card-sub">JSON estructurado con instrucciones incluidas</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <p style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-bottom:18px;line-height:1.6">
+            Descarga un fichero JSON con tus métricas de salud del período seleccionado.
+            Incluye pasos, sueño, FC, HRV, entrenamientos y un resumen estadístico.
+            El fichero ya incluye instrucciones para la IA para que sepa cómo analizarlo.
+          </p>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <a href="/api/settings/export-ai?days=7"
+               class="sett-btn"
+               style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;margin-top:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Últimos 7 días
+            </a>
+            <a href="/api/settings/export-ai?days=14"
+               class="sett-btn"
+               style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:var(--surface-2);color:var(--text);border:1px solid var(--border)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Últimos 14 días
+            </a>
+            <a href="/api/settings/export-ai?days=30"
+               class="sett-btn"
+               style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:var(--surface-2);color:var(--text);border:1px solid var(--border)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Último mes (30 días)
+            </a>
+          </div>
+
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);font-family:var(--font-mono);line-height:1.7">
+            <b>Cómo usarlo:</b><br>
+            1. Descarga el JSON<br>
+            2. Abre Claude.ai o ChatGPT<br>
+            3. Sube el fichero como adjunto<br>
+            4. El fichero ya incluye las instrucciones de análisis
+          </div>
+        </div>
+      </div>
+    </div>
+
     {# ── OBSIDIAN ──────────────────────────────────────────────────────────────── #}
     <div class="sett-panel {% if section == 'obsidian' %}active{% endif %}">
       <div class="sett-page-title">Exportar a Obsidian</div>
@@ -406,6 +517,25 @@ function showMsg(id, type, text) {
 }
 
 // ── Obsidian ──────────────────────────────────────────────────────────────────
+async function saveGoals() {
+  const msg = document.getElementById('goals-msg');
+  const data = {
+    steps_daily:    parseFloat(document.getElementById('g-steps').value)    || 10000,
+    calories_daily: parseFloat(document.getElementById('g-calories').value) || 500,
+    exercise_min:   parseFloat(document.getElementById('g-exercise').value) || 30,
+    stand_hours:    parseFloat(document.getElementById('g-stand').value)    || 12,
+  };
+  const res  = await fetch('/api/settings/goals', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  const d = await res.json();
+  msg.className = 'sett-msg ' + (d.ok ? 'ok' : 'error');
+  msg.textContent = d.ok ? '✓ Objetivos guardados. Los logros se recalcularán.' : 'Error al guardar';
+  msg.style.display = 'block';
+  setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
+
 function downloadObsidian(e) {
   e.preventDefault();
   const date = document.getElementById('obs-date')?.value;

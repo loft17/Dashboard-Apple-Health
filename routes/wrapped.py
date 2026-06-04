@@ -6,9 +6,11 @@ from datetime import datetime
 wrapped_bp = Blueprint('wrapped', __name__)
 
 @wrapped_bp.route('/año')
+@wrapped_bp.route('/año/<int:year>')
 @login_required
-def wrapped_page():
-    year = int(request.args.get('year', datetime.now().year))
+def wrapped_page(year=None):
+    if year is None:
+        year = datetime.now().year
     return render_template('wrapped.html', year=year,
                            current_year=datetime.now().year)
 

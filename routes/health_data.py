@@ -10,13 +10,14 @@ def _validate_date(d):
     except: return datetime.now().strftime('%Y-%m-%d')
 
 @health_data_bp.route('/salud')
+@health_data_bp.route('/salud/<date_param>')
 @login_required
-def health_data_page():
+def health_data_page(date_param=None):
     from services.db import get_available_dates
     from services.db import get_steps_for_day, get_calories, get_sleep_day,                            get_heart_rate_day, get_hrv_day, get_stand_hours,                            get_exercise_minutes, get_distance_km
     from services.workout import list_workouts
 
-    date_str  = _validate_date(request.args.get('date') or datetime.now().strftime('%Y-%m-%d'))
+    date_str  = _validate_date(date_param or request.args.get('date') or datetime.now().strftime('%Y-%m-%d'))
     daterange = get_available_dates()
 
     # Cargar datos del día para el resumen
