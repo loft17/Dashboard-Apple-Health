@@ -78,7 +78,7 @@ def api_day():
     from services.db import get_day_data_batch, get_sleep_score
     batch = get_day_data_batch(date_str)
 
-    # Sueño: query separada (lógica compleja con fases)
+    # Sueño
     sleep = get_sleep_day(date_str)
 
     # Entrenamientos
@@ -92,13 +92,14 @@ def api_day():
     except Exception:
         workouts = []
 
-    # Métricas detalladas (sección /salud) — solo si se necesitan
-    all_metrics    = get_all_metrics(date_str)
+    # Solo recovery y sleep_score para el dashboard principal
     recovery_score = get_recovery_score(date_str)
-    vo2_trend      = get_vo2_trend(date_str)
-    extra          = get_extra_metrics(date_str)
+    sleep_score    = get_sleep_score(date_str)
 
-    sleep_score = get_sleep_score(date_str)
+    # all_metrics, vo2_trend, extra → cargados lazy en /api/day/detail
+    all_metrics = {}
+    vo2_trend   = None
+    extra       = {}
 
     result = {
         'date':           date_str,
@@ -120,6 +121,27 @@ def api_day():
     }
     _cache_set(date_str, result)
     return jsonify(result)
+
+
+@dashboard_bp.route('/api/day/detail')
+def api_day_detail():
+    """Métricas detalladas — cargadas lazy cuando el usuario expande el panel."""
+    date_str = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
+    try:
+        datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+
+    all_metrics = get_all_metrics(date_str)
+    vo2_trend   = get_vo2_trend(date_str)
+    extra       = get_extra_metrics(date_str)
+
+    return jsonify({
+        'date':        date_str,
+        'all_metrics': all_metrics,
+        'vo2_trend':   vo2_trend,
+        'extra':       extra,
+    })
 
 
 @dashboard_bp.route('/api/day/compare')

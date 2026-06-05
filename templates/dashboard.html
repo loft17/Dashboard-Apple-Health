@@ -120,6 +120,7 @@
         <div class="ds-mc-value"><span id="hrv-num">—</span><span class="ds-mc-unit">ms</span></div>
         <div class="chart-wrap" style="position:relative;margin-top:4px">
           <canvas id="hrv-chart" class="metric-chart" height="70"></canvas>
+          <div id="hrv-tip" style="display:none;position:absolute;background:rgba(17,17,17,.88);color:#fff;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap;transform:translateX(-50%)"></div>
         </div>
         <div id="hrv-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-top:2px;padding:0 2px"></div>
       </div>
@@ -147,7 +148,7 @@
 </div>
 
 {# ── Enlace a todos los datos ── #}
-<a class="extra-panel-toggle" id="extra-panel-toggle" href="/salud?date={{ date }}" style="text-decoration:none">
+<a class="extra-panel-toggle" id="extra-panel-toggle" href="/salud?date={{ date }}" style="text-decoration:none" onclick="loadDetail(currentDate)">
   <span>Todos los datos de salud</span>
   <svg class="extra-chevron" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
 </a>
@@ -545,7 +546,21 @@ function goTo(d) {
   closeDropdown();
   loadDay(d);
   // Actualizar enlace a /salud con la fecha actual
-  const link = document.getElementById('extra-panel-toggle');
+  // ── Lazy load del detalle al expandir panel ──────────────────────────────────
+let _detailLoaded = null;
+async function loadDetail(dateStr) {
+  if (_detailLoaded === dateStr) return;
+  _detailLoaded = dateStr;
+  try {
+    const r = await fetch('/api/day/detail?date=' + dateStr);
+    const d = await r.json();
+    updateAllMetrics(d.all_metrics);
+    updateExtra(d.extra);
+    updateVO2Trend(d.vo2_trend);
+  } catch(e) { console.error('loadDetail:', e); }
+}
+
+const link = document.getElementById('extra-panel-toggle');
   if (link) link.href = '/salud?date=' + d;
   history.replaceState(null,'','/dashboard?date='+d);
 }
@@ -892,7 +907,8 @@ function drawHRVBell(canvasId, axisId, hrv) {
 
   const avg = hrv.avg || 0;
   const vals = (hrv.series || []).map(s => s.v).filter(Boolean);
-  if (!avg || vals.length === 0) return;
+  if (!avg || vals.length === 0) { console.log('[HRV] sin datos para campana'); return; }
+  console.log('[HRV] avg='+avg+' vals='+vals.length);
 
   // Parámetros de la distribución
   const mu    = avg;
@@ -986,9 +1002,10 @@ function drawHRVBell(canvasId, axisId, hrv) {
       const yVal = gauss(xVal);
       tip.innerHTML = `<b>${Math.round(xVal)} ms</b>`;
       tip.style.display = 'block';
-      const tx = Math.min(e.clientX - rect.left, rect.width - 80);
+      const tx = e.clientX - rect.left;
+      const ty = Math.max(4, toCanvasY(yVal) / canvas.height * rect.height - 34);
       tip.style.left = tx + 'px';
-      tip.style.top  = Math.max(2, toCanvasY(yVal) / (canvas.height||1) * rect.height - 36) + 'px';
+      tip.style.top  = ty + 'px';
     };
     canvas.onmouseleave = () => { tip.style.display = 'none'; };
   }
@@ -1068,11 +1085,8 @@ function updateDashboard(data) {
 
   // Entrenamientos
   renderWorkouts(data.workouts);
-  // Métricas adicionales
-  updateExtra(data.extra);
-  updateAllMetrics(data.all_metrics);
   updateRecovery(data.recovery_score);
-  updateVO2Trend(data.vo2_trend);
+  // all_metrics y extra se cargan lazy al expandir el panel
   } catch(err) { console.error('updateDashboard error:', err); }
 }
 
@@ -1090,6 +1104,7 @@ function setLoadingState() {
 }
 
 async function loadDay(d) {
+  _detailLoaded = null;  // reset lazy detail
   setLoadingState();
   try {
     const res  = await fetch('/api/day?date='+d);
