@@ -105,6 +105,7 @@ def api_day():
         'date':           date_str,
         'sleep_score':    sleep_score,
         'steps':          batch.get('steps', 0),
+        'steps_series':   batch.get('steps_series', []),
         'distance_km':    batch.get('distance_km', 0),
         'calories':       batch.get('calories', 0),
         'ex_min':         batch.get('ex_min', 0),

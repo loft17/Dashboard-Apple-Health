@@ -353,8 +353,18 @@ def get_day_data_batch(date_str: str) -> dict:
             sl = s.lower()
             return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
         result['steps'] = int(by_src[min(by_src, key=_prio)])
+        # Serie por hora (mejor fuente)
+        best_src = min(by_src, key=_prio)
+        best_rows = [r for r in step_rows if (r['source_name'] or 'unknown').strip() == best_src]
+        hourly_steps = {}
+        for r in best_rows:
+            try: h = int(r['start_date'][11:13])
+            except: h = 0
+            hourly_steps[h] = hourly_steps.get(h, 0) + (r['value'] or 0)
+        result['steps_series'] = [{'h': h, 'v': round(v)} for h, v in sorted(hourly_steps.items())]
     else:
         result['steps'] = 0
+        result['steps_series'] = []
 
     # ── Distancia ─────────────────────────────────────────────────────────────
     dist_rows = by_type.get('HKQuantityTypeIdentifierDistanceWalkingRunning', [])
@@ -391,7 +401,10 @@ def get_day_data_batch(date_str: str) -> dict:
                 h = int(r['start_date'][11:13]) if len(r['start_date']) > 12 else 0
                 if h not in by_hour: by_hour[h] = []
                 by_hour[h].append(r['value'])
-            series = [{'h': h, 'v': round(sum(vs)/len(vs), 1)}
+            series = [{'h': h,
+                         'v':   round(sum(vs)/len(vs), 1),
+                         'max': round(max(vs), 1),
+                         'min': round(min(vs), 1)}
                       for h, vs in sorted(by_hour.items())]
             result['hr'] = {
                 'current': round(vals[-1], 1),

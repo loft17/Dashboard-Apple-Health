@@ -63,35 +63,57 @@
     <div class="ds-metrics-grid">
 
 
-      <div class="ds-metric-card">
-        <div class="ds-mc-label">Distancia</div>
-        <div class="ds-mc-value"><span id="distance-num">—</span><span class="ds-mc-unit">km</span></div>
-        <div class="ds-mc-foot" id="distance-foot" style="color:var(--muted);font-size:10px;font-family:var(--font-mono)"></div>
-      </div>
-
-      <div class="ds-metric-card">
-        <div class="ds-mc-label">Pasos</div>
-        <div class="ds-mc-value"><span id="steps-num">—</span><span class="ds-mc-unit">pasos</span></div>
-        <div class="ds-mc-bar-track"><div class="ds-mc-bar-fill" id="steps-bar" style="width:0%;background:#ff3b5c"></div></div>
-        <div class="ds-mc-foot">Meta 10.000</div>
-        <div class="ds-mc-mini"><div class="mini-bars" id="mini-bars"></div></div>
-      </div>
-
-      <div class="ds-metric-card">
-        <div class="ds-mc-label">FC Media</div>
-        <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span>
-          <span class="ds-mc-trend" id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span>
+      <div class="ds-metric-card ds-steps-dist-card">
+        <!-- Cabecera: pasos + icono -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="ds-mc-label">Pasos</div>
+            <div class="ds-mc-value"><span id="steps-num">—</span><span class="ds-mc-unit">pasos</span></div>
+          </div>
+          <i class="fa-solid fa-person-walking" style="font-size:20px;color:var(--muted);margin-top:4px;flex-shrink:0"></i>
         </div>
-        <div class="chart-wrap" style="position:relative;margin-top:4px">
-          <canvas id="hr-chart" class="metric-chart" height="60"></canvas>
-          <div id="hr-chart-tip" style="display:none;position:absolute;background:rgba(17,17,17,.9);color:#fff;padding:5px 9px;border-radius:8px;font-size:11px;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap"></div>
+        <!-- Barra progreso -->
+        <div class="ds-mc-bar-track" style="margin-top:8px"><div class="ds-mc-bar-fill" id="steps-bar" style="width:0%;background:#ff3b5c"></div></div>
+        <div class="ds-mc-foot" id="steps-goal-label">Meta 10.000</div>
+        <!-- Gráfica de barras por hora -->
+        <div style="position:relative;margin-top:8px">
+          <canvas id="steps-hour-chart" class="metric-chart" height="60"></canvas>
+          <div id="steps-hour-tip" style="display:none;position:absolute;background:rgba(17,17,17,.9);color:#fff;padding:4px 9px;border-radius:8px;font-size:11px;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap;transform:translateX(-50%)"></div>
+        </div>
+        <!-- Separador y distancia -->
+        <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="ds-mc-label">Distancia</div>
+            <div class="ds-mc-value" style="font-size:1.4rem"><span id="distance-num">—</span><span class="ds-mc-unit">km</span></div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" style="width:22px;height:22px"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+        </div>
+      </div>
+
+      <div class="ds-metric-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="ds-mc-label">FC Media</div>
+            <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span><span id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span></div>
+          </div>
+          <i class="fa-solid fa-heart" style="font-size:18px;color:var(--muted);margin-top:4px;flex-shrink:0"></i>
+        </div>
+
+        <div class="chart-wrap" style="position:relative;margin-top:6px">
+          <canvas id="hr-chart" class="metric-chart" height="70"></canvas>
+          <div id="hr-chart-tip" style="display:none;position:absolute;background:rgba(17,17,17,.9);color:#fff;padding:5px 9px;border-radius:8px;font-size:11px;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap;transform:translateX(-50%)"></div>
         </div>
         <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
       </div>
 
       <div class="ds-metric-card">
-        <div class="ds-mc-label">Sueño</div>
-        <div class="ds-mc-value"><span id="sleep-total">—</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="ds-mc-label">Sueño</div>
+            <div class="ds-mc-value"><span id="sleep-total">—</span></div>
+          </div>
+          <i class="fa-solid fa-face-sleeping" style="font-size:18px;color:var(--muted);margin-top:4px;flex-shrink:0"></i>
+        </div>
         <div class="chart-wrap" style="position:relative;margin-top:6px">
           <canvas id="sleep-chart" class="metric-chart" height="40"></canvas>
         </div>
@@ -127,15 +149,23 @@
 
       <div class="ds-metric-card" id="recovery-summary-card" style="display:none">
         <div class="ds-mc-label">Recuperación</div>
-        <div class="ds-mc-value"><span id="rec-score-top" style="color:#34c759">—</span><span class="ds-mc-unit">/ 100</span></div>
-        <div style="height:6px;background:var(--surface-2);border-radius:3px;margin-top:8px;overflow:hidden">
-          <div id="rec-bar-top" style="height:100%;border-radius:3px;width:0%;transition:width 1s ease;background:#34c759"></div>
+        <div class="ds-mc-value"><span id="rec-score-top" style="color:#ff9500">—</span><span class="ds-mc-unit">/ 100</span></div>
+        <!-- Barra degradado con triángulo indicador -->
+        <div style="margin-top:10px;position:relative">
+          <div style="height:8px;border-radius:4px;background:linear-gradient(to right,#ff3b30,#ff9500 35%,#ffcc00 55%,#34c759);position:relative"></div>
+          <div id="rec-bar-pointer" style="position:absolute;top:-1px;left:0%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--text);transition:left 1s ease"></div>
         </div>
-        <div class="ds-mc-foot" id="rec-label-top">—</div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-top:3px">
+          <span>Cansancio</span><span>Normal</span><span>Recuperado</span>
+        </div>
+        <div class="ds-mc-foot" id="rec-label-top" style="margin-top:6px">—</div>
       </div>
 
       <div class="ds-metric-card">
-        <div class="ds-mc-label">Entrenamientos</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="ds-mc-label">Entrenamientos</div>
+          <i class="fa-solid fa-person-walking" style="font-size:18px;color:var(--muted);flex-shrink:0"></i>
+        </div>
         <div id="workouts-count" style="font-size:1.4rem;font-weight:800;letter-spacing:-.03em;margin:4px 0 8px"></div>
         <div id="workouts-list" class="workouts-list">
           <div class="workout-empty">Sin entrenamientos<br>registrados</div>
@@ -663,6 +693,9 @@ function resetRingInstant(id) { /* no-op */ }
 // ── Mini barras // ── Mini barras con tooltip ───────────────────────────────────────────────────
 function renderMiniBars(series) {
   const wrap = document.getElementById('mini-bars');
+  if (!wrap) return;
+  if (!wrap) return;
+  if (!wrap) return;
   wrap.innerHTML = '';
   if (!series || !series.length) return;
   const max = Math.max(...series.map(s => s.v), 1);
@@ -877,7 +910,7 @@ function renderWorkouts(workouts) {
     const href = w._idx != null ? `/workouts/${w._idx}` : null;
     // Iconos SVG simples por tipo
     const SVG = {
-      'Caminar':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="4" r="1.5"/><path d="M8 17l2-6 3 3 2-4"/><path d="M10 17l-2 3"/><path d="M15 14l2 3"/></svg>',
+      'Caminar':   '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="13.5" cy="3.2" r="1.8"/><path d="M9.8 8.9l1.8-2.2c.5-.6 1.2-.8 1.9-.5l3.2 1.2 1.6 2.8h1.7v2h-3l-1.4-2.4-.8 3.2 2.5 2.3v5.3H15v-4.2l-2.6-2.4-1.2 4.2-3.5 2-.9-1.6 3-1.7 1.3-5-1.2-1.1-1.3 1.8H6v-2h2.5l1.3-1.9z"/><path d="M8.5 19.8l-1.2-1.4 2.4-1.4.6 1.9-1.8.9z"/></svg>',
       'Correr':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="14" cy="4" r="1.5"/><path d="M9 18l3-7 3 2 2-5"/><path d="M12 11l-3 3"/></svg>',
       'Ciclismo':  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M6 15l6-9 3 4h3"/></svg>',
       'Fuerza':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 12h16M7 8v8M17 8v8M2 10v4M22 10v4"/></svg>',
@@ -895,6 +928,280 @@ function renderWorkouts(workouts) {
 }
 
 // ── Actualizar dashboard ──────────────────────────────────────────────────────
+// ── Gráfica de barras de pasos por hora ──────────────────────────────────────
+function drawStepsHourBars(canvasId, tipId, series, goalSteps) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 280;
+  const H = canvas.height;
+  canvas.width = W; ctx.clearRect(0,0,W,H);
+  if (!series || !series.length) return;
+
+  const maxV = Math.max(...series.map(s=>s.v), 1);
+  // Color según % del objetivo horario (meta / 16 horas activas)
+  const hourGoal = (goalSteps || 10000) / 16;
+  const color = v => {
+    const pct = v / hourGoal;
+    if (pct >= 1.5) return '#22c55e';   // verde intenso
+    if (pct >= 1.0) return '#4ade80';   // verde
+    if (pct >= 0.6) return '#86efac';   // verde claro
+    if (pct >= 0.3) return '#38bdf8';   // azul
+    return '#7dd3fc';                    // azul claro
+  };
+
+  const n   = Math.max(series.length, 1);
+  const bw  = Math.max(2, Math.floor((W - (n+1)) / n));
+  const gap = Math.floor((W - bw*n) / (n+1));
+
+  // Guardar posiciones para tooltip
+  const barRects = series.map((s, i) => ({
+    x: gap + i*(bw+gap), w: bw, s
+  }));
+
+  series.forEach((s, i) => {
+    const bh = Math.max(2, (s.v / maxV) * (H-4));
+    const x  = gap + i*(bw+gap);
+    const y  = H - bh;
+    ctx.fillStyle = color(s.v);
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, bw, bh, [2,2,0,0])
+                  : ctx.rect(x, y, bw, bh);
+    ctx.fill();
+  });
+
+  // Tooltip
+  const tip = tipId ? document.getElementById(tipId) : null;
+  if (tip) {
+    canvas.onmousemove = e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const hit = barRects.find(b => mx >= b.x && mx <= b.x + b.w);
+      if (hit) {
+        tip.innerHTML = `<b>${hit.s.h}:00h</b> &nbsp;${fmtN(hit.s.v)} pasos`;
+        tip.style.display = 'block';
+        const tx = (hit.x + hit.w/2) / canvas.width * rect.width;
+        tip.style.left = tx + 'px';
+        tip.style.top  = '2px';
+      } else {
+        tip.style.display = 'none';
+      }
+    };
+    canvas.onmouseleave = () => { tip.style.display = 'none'; };
+  }
+}
+
+// ── Gráfica FC con zonas de fondo ────────────────────────────────────────────
+function drawHRZones(canvasId, tipId, series, hrMax) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !series || series.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 280;
+  const H = canvas.height;
+  canvas.width = W; ctx.clearRect(0,0,W,H);
+
+  // FC máxima estimada (220 - edad) o usar el max del día
+  const maxHR = hrMax > 0 ? hrMax : 190;
+  // Zonas de FC (% de FC máx)
+  const zones = [
+    { pct: 0.90, color: 'rgba(255,80,60,0.25)'  },  // Z5 rojo
+    { pct: 0.80, color: 'rgba(255,140,50,0.22)' },  // Z4 naranja
+    { pct: 0.70, color: 'rgba(255,210,60,0.22)' },  // Z3 amarillo
+    { pct: 0.60, color: 'rgba(100,200,80,0.22)' },  // Z2 verde
+    { pct: 0.50, color: 'rgba(80,180,255,0.20)' },  // Z1 azul
+    { pct: 0.00, color: 'rgba(80,180,255,0.08)' },  // base
+  ];
+
+  const allVals = series.map(s => s.v);
+  const minV = Math.max(30, Math.min(...allVals) - 10);
+  const maxV = Math.max(...allVals) + 10;
+  const range = maxV - minV;
+  const toX = i => (i/(series.length-1)) * (W-4) + 2;
+  const toY = v => H-4 - ((v-minV)/range) * (H-12);
+
+  // Dibujar zonas de fondo
+  for (let i=0; i<zones.length-1; i++) {
+    const yTop = toY(zones[i].pct * maxHR);
+    const yBot = toY(zones[i+1].pct * maxHR);
+    // Clamp al canvas
+    const top = Math.max(0, Math.min(yTop, H));
+    const bot = Math.max(0, Math.min(yBot, H));
+    if (bot > top) {
+      ctx.fillStyle = zones[i].color;
+      ctx.fillRect(0, top, W, bot-top);
+    }
+  }
+
+  const pts = series.map((s,i) => ({x:toX(i), y:toY(s.v), d:s}));
+
+  function drawLine() {
+    // Fill suave bajo la línea
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'rgba(255,150,50,0.3)');
+    grad.addColorStop(1,'rgba(255,150,50,0)');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, H);
+    ctx.lineTo(pts[0].x, pts[0].y);
+    pts.forEach((p,i) => { if(i>0) ctx.lineTo(p.x,p.y); });
+    ctx.lineTo(pts[pts.length-1].x, H);
+    ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    // Línea principal
+    ctx.beginPath();
+    pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle='#ff8c42'; ctx.lineWidth=2.5;
+    ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  }
+  drawLine();
+
+  // Tooltip
+  const tip = document.getElementById(tipId);
+  if (!tip) return;
+  let lastBest = -1;
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)*(canvas.width/rect.width);
+    let best=0, bestD=Infinity;
+    pts.forEach((p,i) => { const d=Math.abs(p.x-mx); if(d<bestD){bestD=d;best=i;} });
+    if (lastBest !== best) {
+      lastBest = best;
+      ctx.clearRect(0,0,W,H);
+      // Redibujar zonas
+      for (let i=0; i<zones.length-1; i++) {
+        const yTop=Math.max(0,Math.min(toY(zones[i].pct*maxHR),H));
+        const yBot=Math.max(0,Math.min(toY(zones[i+1].pct*maxHR),H));
+        if(yBot>yTop){ctx.fillStyle=zones[i].color;ctx.fillRect(0,yTop,W,yBot-yTop);}
+      }
+      drawLine();
+      // Línea vertical
+      const px = pts[best].x;
+      ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H);
+      ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+      ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+      // Punto
+      ctx.beginPath(); ctx.arc(pts[best].x, pts[best].y, 4, 0, Math.PI*2);
+      ctx.fillStyle='#ff8c42'; ctx.fill();
+      ctx.beginPath(); ctx.arc(pts[best].x, pts[best].y, 7, 0, Math.PI*2);
+      ctx.strokeStyle='rgba(255,140,66,0.4)'; ctx.lineWidth=2; ctx.stroke();
+    }
+    const s = series[best];
+    tip.innerHTML = `<b>${s.h}:00h</b> &nbsp;<span style="color:#ff8c42">${Math.round(s.v)} PPM</span>`;
+    tip.style.display='block';
+    const tx = Math.max(40, Math.min(e.clientX-rect.left, rect.width-40));
+    tip.style.left=tx+'px'; tip.style.top='4px';
+  };
+  canvas.onmouseleave = () => {
+    tip.style.display='none'; lastBest=-1;
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<zones.length-1;i++){
+      const yTop=Math.max(0,Math.min(toY(zones[i].pct*maxHR),H));
+      const yBot=Math.max(0,Math.min(toY(zones[i+1].pct*maxHR),H));
+      if(yBot>yTop){ctx.fillStyle=zones[i].color;ctx.fillRect(0,yTop,W,yBot-yTop);}
+    }
+    drawLine();
+  };
+}
+
+// ── Gráfica FC multi-línea (pico/media/rango) ────────────────────────────────
+function drawHRMultiLine(canvasId, tipId, series) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !series || series.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 280;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0, 0, W, H);
+
+  // Valores globales para escala
+  const allVals = series.flatMap(s => [s.v, s.max||s.v, s.min||s.v]);
+  const minV = Math.min(...allVals) - 5;
+  const maxV = Math.max(...allVals) + 5;
+  const range = maxV - minV || 1;
+
+  const toX = i  => (i / (series.length-1)) * (W-6) + 3;
+  const toY = v  => H - 6 - ((v - minV) / range) * (H - 16);
+
+  const ptsMax = series.map((s,i) => ({x: toX(i), y: toY(s.max||s.v), d: s}));
+  const ptsAvg = series.map((s,i) => ({x: toX(i), y: toY(s.v),        d: s}));
+  const ptsMin = series.map((s,i) => ({x: toX(i), y: toY(s.min||s.v), d: s}));
+
+  function drawPath(pts, color, lw, fill) {
+    ctx.beginPath();
+    pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    if (fill) {
+      const last = pts[pts.length-1];
+      ctx.lineTo(last.x, H); ctx.lineTo(pts[0].x, H); ctx.closePath();
+      ctx.fillStyle = fill; ctx.fill();
+      ctx.beginPath();
+      pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+  }
+
+  // Área de rango (min-max sombreada)
+  ctx.beginPath();
+  ptsMax.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  [...ptsMin].reverse().forEach(p => ctx.lineTo(p.x,p.y));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(100,181,246,0.12)';
+  ctx.fill();
+
+  // Línea rango min (azul tenue)
+  drawPath(ptsMin, 'rgba(100,181,246,0.6)', 1.5);
+  // Línea pico max (rojo)
+  drawPath(ptsMax, '#ff6b6b', 2);
+  // Línea media (amarillo/naranja) — encima de todo
+  drawPath(ptsAvg, '#ffd166', 2);
+
+  // Tooltip
+  const tip = document.getElementById(tipId);
+  if (!tip) return;
+
+  function redraw() {
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath();
+    ptsMax.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    [...ptsMin].reverse().forEach(p => ctx.lineTo(p.x,p.y));
+    ctx.closePath(); ctx.fillStyle='rgba(100,181,246,0.12)'; ctx.fill();
+    drawPath(ptsMin,'rgba(100,181,246,0.6)',1.5);
+    drawPath(ptsMax,'#ff6b6b',2);
+    drawPath(ptsAvg,'#ffd166',2);
+  }
+
+  let lastBest = -1;
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx   = (e.clientX - rect.left) * (canvas.width / rect.width);
+    let best=0, bestD=Infinity;
+    ptsAvg.forEach((p,i) => { const d=Math.abs(p.x-mx); if(d<bestD){bestD=d;best=i;} });
+    if (lastBest !== best) {
+      lastBest = best;
+      redraw();
+      const p = ptsAvg[best];
+      const pm = ptsMax[best];
+      const pn = ptsMin[best];
+      // Punto en la línea media
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle='#ffd166'; ctx.fill();
+      // Línea vertical
+      ctx.beginPath(); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, H);
+      ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+      ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const s = series[best];
+    tip.innerHTML = `<b>${s.h}:00h</b> &nbsp;`+
+      `<span style="color:#ff6b6b">↑${Math.round(s.max||s.v)}</span> `+
+      `<span style="color:#ffd166">${Math.round(s.v)}</span> `+
+      `<span style="color:#64b5f6">↓${Math.round(s.min||s.v)}</span> PPM`;
+    tip.style.display = 'block';
+    const tx = Math.max(50, Math.min(e.clientX-rect.left, rect.width-50));
+    tip.style.left = tx+'px';
+    tip.style.top  = '4px';
+  };
+  canvas.onmouseleave = () => { tip.style.display='none'; lastBest=-1; redraw(); };
+}
+
 // ── Gráfica HRV tipo distribución normal ─────────────────────────────────────
 function drawHRVBell(canvasId, axisId, hrv) {
   const canvas = document.getElementById(canvasId);
@@ -907,8 +1214,7 @@ function drawHRVBell(canvasId, axisId, hrv) {
 
   const avg = hrv.avg || 0;
   const vals = (hrv.series || []).map(s => s.v).filter(Boolean);
-  if (!avg || vals.length === 0) { console.log('[HRV] sin datos para campana'); return; }
-  console.log('[HRV] avg='+avg+' vals='+vals.length);
+  if (!avg || vals.length === 0) return;
 
   // Parámetros de la distribución
   const mu    = avg;
@@ -1029,20 +1335,23 @@ function updateDashboard(data) {
 
   renderMiniBars(data.cal_series);
 
-  // Pasos
+  // Pasos + distancia (tarjeta unificada)
+  const goalSteps = data.goals?.steps_daily || 10000;
   document.getElementById('steps-num').textContent = fmtN(data.steps||0);
-  document.getElementById('steps-bar').style.width = Math.min((data.steps||0)/100, 100)+'%';
+  document.getElementById('steps-bar').style.width = Math.min((data.steps||0)/goalSteps*100, 100)+'%';
+  const stepsGoalEl = document.getElementById('steps-goal-label');
+  if (stepsGoalEl) stepsGoalEl.textContent = 'Meta ' + fmtN(goalSteps);
+  // Gráfica de barras por hora
+  drawStepsHourBars('steps-hour-chart', 'steps-hour-tip', data.steps_series || [], goalSteps);
   // Distancia
   const distEl=document.getElementById('distance-num'); if(distEl) distEl.textContent=(data.distance_km||0).toFixed(2);
-  const distFt=document.getElementById('distance-foot'); if(distFt) distFt.textContent=data.distance_km>0.1?(data.distance_km.toFixed(2)+' km hoy'):'';
 
   // FC
   const hr = data.hr || {};
   document.getElementById('hr-current').textContent = hr.avg ? Math.round(hr.avg) : '—';
   document.getElementById('hr-avg').textContent     = hr.avg     || '—';
   document.getElementById('hr-range').textContent   = hr.min && hr.max ? `${hr.min}–${hr.max} PPM` : '—';
-  drawLineChart('hr-chart', hr.series, '#ff6b6b', 'rgba(255,107,107,0.1)',
-    d => `<b>${d.h}:00</b><br>${d.v} PPM`, 'hr-chart-tip');
+  drawHRZones('hr-chart', 'hr-chart-tip', hr.series, hr.max || 0);
 
   // HRV
   const hrv = data.hrv || {};
@@ -1845,13 +2154,9 @@ function updateRecovery(rs) {
     const barEl   = document.getElementById('rec-bar-top');
     const labelEl = document.getElementById('rec-label-top');
     if (scoreEl) { scoreEl.textContent = rs.score; scoreEl.style.color = rs.color; }
-    if (barEl)   { barEl.style.width = rs.score + '%'; barEl.style.background = rs.color; }
-    if (labelEl) {
-      const details = [];
-      if (rs.hrv_today) details.push(`HRV ${rs.hrv_today} ms`);
-      if (rs.rhr_today) details.push(`FC rep. ${rs.rhr_today} PPM`);
-      labelEl.textContent = rs.label;
-    }
+    const ptr = document.getElementById('rec-bar-pointer');
+    if (ptr) ptr.style.left = Math.min(98, Math.max(2, rs.score)) + '%';
+    if (labelEl) { labelEl.textContent = rs.label; }
   }
 }
 
