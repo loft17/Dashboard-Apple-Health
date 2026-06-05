@@ -3,9 +3,9 @@
  * Cachea: assets estáticos, tiles de OpenStreetMap
  */
 
-const CACHE_STATIC  = 'health-static-v1';
-const CACHE_TILES   = 'health-tiles-v1';
-const CACHE_API     = 'health-api-v1';
+const CACHE_STATIC  = 'health-static-v2';
+const CACHE_TILES   = 'health-tiles-v2';
+const CACHE_API     = 'health-api-v2';
 
 const STATIC_ASSETS = [
   '/static/css/base.css',
@@ -59,7 +59,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Todo lo demás → red directamente
-  event.respondWith(fetch(event.request));
+  event.respondWith(fetch(event.request).catch(() => new Response('', {status:503})));
 });
 
 // ── Estrategia Cache First ─────────────────────────────────────────────────────

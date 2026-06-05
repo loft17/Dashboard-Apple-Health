@@ -384,10 +384,21 @@ def get_day_data_batch(date_str: str) -> dict:
     if hr_rows:
         vals = [r['value'] for r in hr_rows if r['value']]
         if vals:
+            # Agrupar por hora para la gráfica (series con clave h y v)
+            by_hour = {}
+            for r in hr_rows:
+                if not r['value']: continue
+                h = int(r['start_date'][11:13]) if len(r['start_date']) > 12 else 0
+                if h not in by_hour: by_hour[h] = []
+                by_hour[h].append(r['value'])
+            series = [{'h': h, 'v': round(sum(vs)/len(vs), 1)}
+                      for h, vs in sorted(by_hour.items())]
             result['hr'] = {
+                'current': round(vals[-1], 1),
                 'avg': round(sum(vals)/len(vals), 1),
                 'min': round(min(vals), 1),
                 'max': round(max(vals), 1),
+                'series': series,
                 'raw': [{'t': r['start_date'][11:16], 'v': r['value']} for r in hr_rows if r['value']],
             }
         else:
@@ -399,7 +410,13 @@ def get_day_data_batch(date_str: str) -> dict:
     hrv_rows = by_type.get('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', [])
     if hrv_rows:
         vals = [r['value'] for r in hrv_rows if r['value']]
-        result['hrv'] = {'avg': round(sum(vals)/len(vals), 1)} if vals else {}
+        if vals:
+            result['hrv'] = {
+                'avg':    round(sum(vals)/len(vals), 1),
+                'series': [{'v': round(v, 1)} for v in vals],
+            }
+        else:
+            result['hrv'] = {}
     else:
         result['hrv'] = {}
 
@@ -1122,6 +1139,55 @@ def get_all_metrics(date_str: str) -> dict:
 
 
 # ── Puntuación de recuperación y tendencia VO₂ ────────────────────────────────
+
+def get_sleep_score(date_str: str) -> dict:
+    """Puntuacion de sueño 0-100 basada en duracion, calidad, continuidad y respiracion."""
+    sleep = get_sleep_day(date_str)
+    if not sleep or not sleep.get('total_min', 0):
+        return {}
+
+    total_min = sleep.get('total_min', 0)
+    total_h   = total_min / 60
+    deep_min  = sleep.get('deep_min', 0) or 0
+    rem_min   = sleep.get('rem_min',  0) or 0
+    inbed_min = sleep.get('inbed_min', total_min) or total_min
+
+    # Duracion (0-40 pts)
+    dur_pts = 40 if total_h >= 7.5 else 35 if total_h >= 7.0 else 25 if total_h >= 6.0 else 15 if total_h >= 5.0 else 5
+
+    # Calidad profundo+REM (0-35 pts)
+    q = (deep_min + rem_min) / total_min * 100 if total_min else 0
+    qual_pts = 35 if q >= 40 else 28 if q >= 30 else 20 if q >= 20 else 12 if q >= 10 else 5
+
+    # Continuidad (0-15 pts)
+    cont = total_min / inbed_min * 100 if inbed_min else 100
+    cont_pts = 15 if cont >= 90 else 11 if cont >= 80 else 7
+
+    # Respiracion (0-10 pts)
+    breath = _avg_numeric(date_str, 'HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances')
+    brth_pts = 10 if breath is None else 10 if breath < 5 else 6 if breath < 10 else 3 if breath < 20 else 0
+
+    score = min(100, dur_pts + qual_pts + cont_pts + brth_pts)
+
+    if score >= 85:   level, color = 'Excelente', '#34c759'
+    elif score >= 70: level, color = 'Bueno',     '#30d158'
+    elif score >= 55: level, color = 'Regular',   '#ff9f0a'
+    elif score >= 40: level, color = 'Malo',      '#ff6b35'
+    else:             level, color = 'Muy malo',  '#ff3b30'
+
+    return {
+        'score':   score,
+        'level':   level,
+        'color':   color,
+        'total_h': round(total_h, 1),
+        'details': [
+            {'label': 'Duracion',   'pts': dur_pts,  'max': 40},
+            {'label': 'Profundo+REM','pts': qual_pts, 'max': 35},
+            {'label': 'Continuidad','pts': cont_pts, 'max': 15},
+            {'label': 'Respiracion','pts': brth_pts, 'max': 10},
+        ],
+    }
+
 
 def get_recovery_score(date_str: str) -> dict | None:
     """

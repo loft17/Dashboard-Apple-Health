@@ -75,7 +75,7 @@ def api_day():
         return jsonify(cached)
 
     # ── BATCH: una sola conexión para todas las métricas ─────────────────────
-    from services.db import get_day_data_batch
+    from services.db import get_day_data_batch, get_sleep_score
     batch = get_day_data_batch(date_str)
 
     # Sueño: query separada (lógica compleja con fases)
@@ -98,8 +98,11 @@ def api_day():
     vo2_trend      = get_vo2_trend(date_str)
     extra          = get_extra_metrics(date_str)
 
+    sleep_score = get_sleep_score(date_str)
+
     result = {
         'date':           date_str,
+        'sleep_score':    sleep_score,
         'steps':          batch.get('steps', 0),
         'distance_km':    batch.get('distance_km', 0),
         'calories':       batch.get('calories', 0),

@@ -74,20 +74,19 @@
         <div class="ds-mc-value"><span id="steps-num">—</span><span class="ds-mc-unit">pasos</span></div>
         <div class="ds-mc-bar-track"><div class="ds-mc-bar-fill" id="steps-bar" style="width:0%;background:#ff3b5c"></div></div>
         <div class="ds-mc-foot">Meta 10.000</div>
-        <div class="ds-mc-compare" id="cmp-steps"></div>
         <div class="ds-mc-mini"><div class="mini-bars" id="mini-bars"></div></div>
       </div>
 
       <div class="ds-metric-card">
-        <div class="ds-mc-label">Ritmo cardíaco</div>
+        <div class="ds-mc-label">FC Media</div>
         <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span>
           <span class="ds-mc-trend" id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span>
         </div>
         <div class="chart-wrap" style="position:relative;margin-top:4px">
-          <canvas id="hr-chart" class="metric-chart" height="50"></canvas>
+          <canvas id="hr-chart" class="metric-chart" height="60"></canvas>
+          <div id="hr-chart-tip" style="display:none;position:absolute;background:rgba(17,17,17,.9);color:#fff;padding:5px 9px;border-radius:8px;font-size:11px;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap"></div>
         </div>
         <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
-        <div class="ds-mc-compare" id="cmp-hr"></div>
       </div>
 
       <div class="ds-metric-card">
@@ -101,14 +100,28 @@
           <span class="legend-dot" style="background:#bf5af2;width:7px;height:7px;border-radius:50%;display:inline-block;margin:0 3px"></span>REM
           <span class="legend-dot" style="background:#63c3f5;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px"></span>Lig
         </div>
+        <div id="ds-sleep-score-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--font-mono);margin-bottom:5px">Calidad del sueño</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="position:relative;width:40px;height:40px;flex-shrink:0">
+              <canvas id="ds-sleep-score-ring" width="40" height="40"></canvas>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:var(--font-mono)" id="ds-sleep-score-num"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700" id="ds-sleep-score-level"></div>
+              <div style="display:none" id="ds-sleep-score-detail"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="ds-metric-card">
         <div class="ds-mc-label">HRV</div>
         <div class="ds-mc-value"><span id="hrv-num">—</span><span class="ds-mc-unit">ms</span></div>
         <div class="chart-wrap" style="position:relative;margin-top:4px">
-          <canvas id="hrv-chart" class="metric-chart" height="50"></canvas>
+          <canvas id="hrv-chart" class="metric-chart" height="70"></canvas>
         </div>
+        <div id="hrv-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-top:2px;padding:0 2px"></div>
       </div>
 
       <div class="ds-metric-card" id="recovery-summary-card" style="display:none">
@@ -122,8 +135,9 @@
 
       <div class="ds-metric-card">
         <div class="ds-mc-label">Entrenamientos</div>
-        <div id="workouts-list" class="workouts-list" style="margin-top:4px">
-          <div class="workout-empty">Sin entrenamientos</div>
+        <div id="workouts-count" style="font-size:1.4rem;font-weight:800;letter-spacing:-.03em;margin:4px 0 8px"></div>
+        <div id="workouts-list" class="workouts-list">
+          <div class="workout-empty">Sin entrenamientos<br>registrados</div>
         </div>
       </div>
 
@@ -660,7 +674,7 @@ function renderMiniBars(series) {
 }
 
 // ── Gráfica de línea suave (spline) con tooltip ───────────────────────────────
-function drawLineChart(canvasId, series, color, fillColor, labelFn) {
+function drawLineChart(canvasId, series, color, fillColor, labelFn, tipId) {
   const canvas = document.getElementById(canvasId); if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const W = canvas.parentElement.offsetWidth || 280;
@@ -749,7 +763,20 @@ function drawLineChart(canvasId, series, color, fillColor, labelFn) {
     // Umbral generoso: siempre hay punto activo mientras el cursor esté en el canvas
     const threshold = W;  // todo el ancho = siempre activo
     if (labelFn) {
-      showTooltip(e.clientX, e.clientY, labelFn(pts[best].d, best));
+      if (tipId) {
+        const tip = document.getElementById(tipId);
+        if (tip) {
+          const rect  = canvas.getBoundingClientRect();
+          const hp    = pts[best];
+          tip.innerHTML = labelFn(hp.d, best);
+          tip.style.display = 'block';
+          const tx = Math.min(hp.x / canvas.width * rect.width, rect.width - 110);
+          tip.style.left = tx + 'px';
+          tip.style.top  = Math.max(0, hp.y / canvas.height * rect.height - 38) + 'px';
+        }
+      } else {
+        showTooltip(e.clientX, e.clientY, labelFn(pts[best].d, best));
+      }
       if (hoveredIdx !== best) {
         hoveredIdx = best;
         redraw();
@@ -773,7 +800,8 @@ function drawLineChart(canvasId, series, color, fillColor, labelFn) {
   canvas.onmouseleave = () => {
     _canvasHover = false;
     if (hoveredIdx !== -1) { redraw(); hoveredIdx = -1; }
-    hideTooltipForce();
+    if (tipId) { const t=document.getElementById(tipId); if(t) t.style.display='none'; }
+    else hideTooltipForce();
   };
 }
 
@@ -822,31 +850,150 @@ function drawSleepChart(segments) {
 function renderWorkouts(workouts) {
   const list = document.getElementById('workouts-list');
   if (!workouts || !workouts.length) {
-    list.innerHTML = '<div class="workout-empty">Sin entrenamientos registrados</div>';
+    list.innerHTML = '<div class="workout-empty">Sin entrenamientos<br>registrados</div>';
     return;
   }
-  list.innerHTML = workouts.map(w => {
-    const icon  = w.icon  || '🏅';
-    const name  = w.name  || w.type?.replace('HKWorkoutActivityType','') || 'Entrenamiento';
-    const dur   = w.duration_fmt || (w.dur_min ? w.dur_min + ' min' : '');
-    const dist  = w.dist_km  ? w.dist_km  + ' km'   : '';
-    const kcal  = w.kcal     ? w.kcal     + ' kcal'  : '';
-    const meta  = [dist, kcal].filter(Boolean).join(' · ');
-    const href  = w._idx != null ? `/workouts/${w._idx}` : null;
-    const tag   = href ? `a href="${href}"` : 'div';
-    const etag  = href ? 'a' : 'div';
-    return `<${tag} class="workout-row ${href?'workout-row-link':''}" style="${href?'text-decoration:none':''}">
-      <div class="workout-icon" style="filter:grayscale(1);opacity:.55">${icon}</div>
-      <div class="workout-info">
-        <div class="workout-name">${name}</div>
-        <div class="workout-meta">${dur}${meta?' · '+meta:''}</div>
-      </div>
-      ${w.has_route ? '<span class="workout-route-dot" title="Tiene ruta GPS">🗺</span>' : ''}
-    </${etag}>`;
-  }).join('');
+  const count = workouts.length;
+  const countEl = document.getElementById('workouts-count');
+  if (countEl) countEl.textContent = count + ' entrenamiento' + (count>1?'s':'') + ' hoy';
+  list.innerHTML = '<div class="wk-grid">' + workouts.slice(0,4).map(w => {
+    const name = w.name || w.type?.replace('HKWorkoutActivityType','') || 'Entrenamiento';
+    const dur  = w.duration_fmt || (w.dur_min ? w.dur_min + ' min' : '');
+    const href = w._idx != null ? `/workouts/${w._idx}` : null;
+    // Iconos SVG simples por tipo
+    const SVG = {
+      'Caminar':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="4" r="1.5"/><path d="M8 17l2-6 3 3 2-4"/><path d="M10 17l-2 3"/><path d="M15 14l2 3"/></svg>',
+      'Correr':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="14" cy="4" r="1.5"/><path d="M9 18l3-7 3 2 2-5"/><path d="M12 11l-3 3"/></svg>',
+      'Ciclismo':  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M6 15l6-9 3 4h3"/></svg>',
+      'Fuerza':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 12h16M7 8v8M17 8v8M2 10v4M22 10v4"/></svg>',
+      'Natación':  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 16c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><circle cx="12" cy="8" r="3"/></svg>',
+      'Yoga':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="4" r="1.5"/><path d="M12 6v6l-4 4M12 12l4 4M8 20h8"/></svg>',
+    };
+    const svg = SVG[name] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>';
+    const inner = `<div class="wk-card-icon">${svg}</div>
+      <div class="wk-card-name">${name}</div>
+      <div class="wk-card-dur">${dur}</div>`;
+    return href
+      ? `<a href="${href}" class="wk-card" style="text-decoration:none">${inner}</a>`
+      : `<div class="wk-card">${inner}</div>`;
+  }).join('') + '</div>';
 }
 
 // ── Actualizar dashboard ──────────────────────────────────────────────────────
+// ── Gráfica HRV tipo distribución normal ─────────────────────────────────────
+function drawHRVBell(canvasId, axisId, hrv) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 260;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0, 0, W, H);
+
+  const avg = hrv.avg || 0;
+  const vals = (hrv.series || []).map(s => s.v).filter(Boolean);
+  if (!avg || vals.length === 0) return;
+
+  // Parámetros de la distribución
+  const mu    = avg;
+  const sigma = vals.length > 1
+    ? Math.sqrt(vals.reduce((s,v) => s+(v-mu)**2, 0) / vals.length)
+    : mu * 0.25;
+  const sd    = Math.max(sigma, mu * 0.1);
+
+  // Rango del eje X: mu ± 3*sd, redondeado a 5
+  const xMin = Math.round((mu - 3*sd) / 5) * 5;
+  const xMax = Math.round((mu + 3*sd) / 5) * 5;
+  const xRange = xMax - xMin;
+
+  // Función gaussiana normalizada
+  const gauss = x => Math.exp(-0.5 * ((x - mu) / sd) ** 2);
+
+  // Muestrear puntos
+  const N = 120;
+  const pts = Array.from({length: N+1}, (_, i) => {
+    const x = xMin + (i/N) * xRange;
+    return { x, y: gauss(x) };
+  });
+
+  // Escalar Y (pico en 85% del alto, dejar espacio para eje)
+  const yScale = (H - 16) * 0.85;
+  const toCanvasX = x => (x - xMin) / xRange * (W - 4) + 2;
+  const toCanvasY = y => (H - 14) - y * yScale;
+
+  // Gradiente (morado→azul como la imagen)
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0,   'rgba(191,90,242,0.0)');
+  grad.addColorStop(0.35,'rgba(191,90,242,0.6)');
+  grad.addColorStop(0.5, 'rgba(91,141,238,0.8)');
+  grad.addColorStop(0.65,'rgba(91,141,238,0.6)');
+  grad.addColorStop(1,   'rgba(91,141,238,0.0)');
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(xMin), toCanvasY(0));
+  pts.forEach(p => ctx.lineTo(toCanvasX(p.x), toCanvasY(p.y)));
+  ctx.lineTo(toCanvasX(xMax), toCanvasY(0));
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Línea de contorno
+  const lineGrad = ctx.createLinearGradient(0, 0, W, 0);
+  lineGrad.addColorStop(0,    'rgba(191,90,242,0)');
+  lineGrad.addColorStop(0.35, '#bf5af2');
+  lineGrad.addColorStop(0.5,  '#5b8dee');
+  lineGrad.addColorStop(0.65, '#5b8dee');
+  lineGrad.addColorStop(1,    'rgba(91,141,238,0)');
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0
+    ? ctx.moveTo(toCanvasX(p.x), toCanvasY(p.y))
+    : ctx.lineTo(toCanvasX(p.x), toCanvasY(p.y)));
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Línea vertical en el valor actual (mu)
+  const muX = toCanvasX(mu);
+  ctx.beginPath();
+  ctx.moveTo(muX, toCanvasY(1.05));
+  ctx.lineTo(muX, H - 14);
+  ctx.strokeStyle = '#5b8dee';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Eje inferior con etiquetas "Ado · media · Más."
+  const axisEl = document.getElementById(axisId);
+  if (axisEl) {
+    const p25 = Math.round(mu - sd);
+    const p75 = Math.round(mu + sd);
+    axisEl.innerHTML =
+      `<span>Ado</span>` +
+      `<span>${p25} – ${Math.round(mu)} – ${p75} ms</span>` +
+      `<span>Más.</span>`;
+  }
+
+  // Tooltip interactivo
+  const tip = document.getElementById('hrv-tip');
+  if (tip) {
+    canvas.onmousemove = e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx   = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const xVal = xMin + (mx / (canvas.width||1)) * xRange;
+      const yVal = gauss(xVal);
+      tip.innerHTML = `<b>${Math.round(xVal)} ms</b>`;
+      tip.style.display = 'block';
+      const tx = Math.min(e.clientX - rect.left, rect.width - 80);
+      tip.style.left = tx + 'px';
+      tip.style.top  = Math.max(2, toCanvasY(yVal) / (canvas.height||1) * rect.height - 36) + 'px';
+    };
+    canvas.onmouseleave = () => { tip.style.display = 'none'; };
+  }
+}
+
 function updateDashboard(data) {
   try {
   // Actividad
@@ -874,22 +1021,44 @@ function updateDashboard(data) {
 
   // FC
   const hr = data.hr || {};
-  document.getElementById('hr-current').textContent = hr.current || '—';
+  document.getElementById('hr-current').textContent = hr.avg ? Math.round(hr.avg) : '—';
   document.getElementById('hr-avg').textContent     = hr.avg     || '—';
   document.getElementById('hr-range').textContent   = hr.min && hr.max ? `${hr.min}–${hr.max} PPM` : '—';
   drawLineChart('hr-chart', hr.series, '#ff6b6b', 'rgba(255,107,107,0.1)',
-    d => `<b>${d.h}:00</b><br>${d.v} PPM`);
+    d => `<b>${d.h}:00</b><br>${d.v} PPM`, 'hr-chart-tip');
 
   // HRV
   const hrv = data.hrv || {};
   document.getElementById('hrv-num').textContent = hrv.avg ? fmtN(hrv.avg,1) : '—';
-  drawLineChart('hrv-chart', hrv.series, '#5b8dee', 'rgba(91,141,238,0.1)',
-    (_,i) => `Medición ${(i||0)+1}<br>${hrv.series?.[i]?.v||'—'} ms`);
+  drawHRVBell('hrv-chart', 'hrv-axis', hrv);
 
   // Sueño
   const sleep = data.sleep || {};
   document.getElementById('sleep-total').textContent = sleep.total_str || '—';
   drawSleepChart(sleep.segments);
+
+  // Calidad del sueño
+  const ss = data.sleep_score || {};
+  const ssWrap = document.getElementById('ds-sleep-score-wrap');
+  if (ssWrap && ss.score > 0) {
+    ssWrap.style.display = 'block';
+    const numEl = document.getElementById('ds-sleep-score-num');
+    const lvlEl = document.getElementById('ds-sleep-score-level');
+    const detEl = document.getElementById('ds-sleep-score-detail');
+    if (numEl) { numEl.textContent = ss.score; numEl.style.color = ss.color; }
+    if (lvlEl) { lvlEl.textContent = ss.level; lvlEl.style.color = ss.color; }
+    if (detEl) detEl.style.display = 'none';
+    const ring = document.getElementById('ds-sleep-score-ring');
+    if (ring) {
+      const rc=ring.getContext('2d'),cx=20,cy=20,r=16,lw=4;
+      rc.clearRect(0,0,40,40);
+      rc.beginPath();rc.arc(cx,cy,r,0,Math.PI*2);
+      rc.strokeStyle='rgba(120,120,120,0.15)';rc.lineWidth=lw;rc.stroke();
+      rc.beginPath();rc.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*(ss.score/100));
+      rc.strokeStyle=ss.color||'#34c759';rc.lineWidth=lw;rc.lineCap='round';rc.stroke();
+    }
+  }
+
   // Gráfica estilo Apple
   if (sleep.segments) {
     const tot = document.getElementById('sleep-apple-total');
@@ -899,7 +1068,6 @@ function updateDashboard(data) {
 
   // Entrenamientos
   renderWorkouts(data.workouts);
-  updateCompare(data);
   // Métricas adicionales
   updateExtra(data.extra);
   updateAllMetrics(data.all_metrics);
@@ -1667,7 +1835,7 @@ function updateRecovery(rs) {
       const details = [];
       if (rs.hrv_today) details.push(`HRV ${rs.hrv_today} ms`);
       if (rs.rhr_today) details.push(`FC rep. ${rs.rhr_today} PPM`);
-      labelEl.textContent = rs.label + (details.length ? ' · ' + details.join(' · ') : '');
+      labelEl.textContent = rs.label;
     }
   }
 }
@@ -2253,7 +2421,6 @@ async function exportDayPDF() {
 syncButtons(currentDate);
 updateDateLabel(currentDate);
 loadDay(currentDate);
-loadCompare();
 
 // Prefetch silencioso de días adyacentes tras 2 segundos de inactividad
 setTimeout(() => {
