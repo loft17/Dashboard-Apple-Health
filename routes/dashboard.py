@@ -3,25 +3,40 @@
 from flask import Blueprint, jsonify, render_template, request
 from datetime import datetime
 
-# ── Caché en memoria ────────────────────────────────────────────────────────────
-_DAY_CACHE = {}   # { date_str: (timestamp, data) }
-_CACHE_TTL  = 300  # 5 min — días antiguos pueden ser más largos
+# ── Caché persistente en disco ──────────────────────────────────────────────────
+from services.cache import (get_cached_day, set_cached_day,
+                             invalidate_all, invalidate_from,
+                             is_today, get_last_import_date)
+import threading
+_MEM_CACHE = {}
+_MEM_LOCK  = threading.Lock()
 
 def _cache_get(date_str):
-    if date_str in _DAY_CACHE:
-        ts, data = _DAY_CACHE[date_str]
-        age = (datetime.now() - ts).total_seconds()
-        # Hoy: 5 min. Días pasados: 7 días (nunca cambian una vez importados)
-        ttl = _CACHE_TTL if date_str == datetime.now().strftime('%Y-%m-%d') else 86400 * 7
-        if age < ttl:
-            return data
-    return None
+    if is_today(date_str):
+        with _MEM_LOCK:
+            if date_str in _MEM_CACHE:
+                ts, data = _MEM_CACHE[date_str]
+                if (datetime.now() - ts).total_seconds() < 300:
+                    return data
+        return None
+    return get_cached_day(date_str)
 
 def _cache_set(date_str, data):
-    _DAY_CACHE[date_str] = (datetime.now(), data)
+    if is_today(date_str):
+        with _MEM_LOCK:
+            _MEM_CACHE[date_str] = (datetime.now(), data)
+    else:
+        set_cached_day(date_str, data)
 
 def invalidate_cache():
-    _DAY_CACHE.clear()
+    """Al importar: solo invalida desde el último día importado, no todo."""
+    with _MEM_LOCK:
+        _MEM_CACHE.clear()
+    last = get_last_import_date()
+    if last:
+        invalidate_from(last)  # solo el día del import y posteriores
+    else:
+        invalidate_all()
 
 from services.workout import list_workouts as _list_workouts, _WORKOUT_CACHE
 from services.db import (
@@ -74,36 +89,30 @@ def api_day():
     if cached:
         return jsonify(cached)
 
-    # ── BATCH: una sola conexión para todas las métricas ─────────────────────
+    result = _build_day_data(date_str)
+    _cache_set(date_str, result)
+    return jsonify(result)
+
+
+def _build_day_data(date_str: str) -> dict:
+    """Construye los datos del día. Usado por api_day y el warm-up del caché."""
     from services.db import get_day_data_batch, get_sleep_score
-    batch = get_day_data_batch(date_str)
-
-    # Sueño
-    sleep = get_sleep_day(date_str)
-
-    # Entrenamientos
+    batch          = get_day_data_batch(date_str)
+    sleep          = get_sleep_day(date_str)
+    recovery_score = get_recovery_score(date_str)
+    sleep_score_d  = get_sleep_score(date_str)
     try:
         all_wk   = _list_workouts()
-        workouts = [
-            {**w, '_idx': i}
-            for i, w in enumerate(all_wk)
-            if w['date'] == date_str
-        ]
+        workouts = [{**w, '_idx': i} for i, w in enumerate(all_wk) if w['date'] == date_str]
     except Exception:
         workouts = []
+    from services.db import get_day_compare
+    compare = get_day_compare(date_str)
 
-    # Solo recovery y sleep_score para el dashboard principal
-    recovery_score = get_recovery_score(date_str)
-    sleep_score    = get_sleep_score(date_str)
-
-    # all_metrics, vo2_trend, extra → cargados lazy en /api/day/detail
-    all_metrics = {}
-    vo2_trend   = None
-    extra       = {}
-
-    result = {
+    return {
         'date':           date_str,
-        'sleep_score':    sleep_score,
+        'sleep_score':    sleep_score_d,
+        'compare':        compare,
         'steps':          batch.get('steps', 0),
         'steps_series':   batch.get('steps_series', []),
         'distance_km':    batch.get('distance_km', 0),
@@ -115,13 +124,11 @@ def api_day():
         'sleep':          sleep,
         'workouts':       workouts,
         'cal_series':     batch.get('cal_series', []),
-        'extra':          extra,
-        'all_metrics':    all_metrics,
+        'extra':          {},
+        'all_metrics':    {},
         'recovery_score': recovery_score,
-        'vo2_trend':      vo2_trend,
+        'vo2_trend':      None,
     }
-    _cache_set(date_str, result)
-    return jsonify(result)
 
 
 @dashboard_bp.route('/api/day/detail')
@@ -136,12 +143,15 @@ def api_day_detail():
     all_metrics = get_all_metrics(date_str)
     vo2_trend   = get_vo2_trend(date_str)
     extra       = get_extra_metrics(date_str)
+    # Incluir sleep con segments para la gráfica de /salud/
+    sleep = get_sleep_day(date_str)
 
     return jsonify({
         'date':        date_str,
         'all_metrics': all_metrics,
         'vo2_trend':   vo2_trend,
         'extra':       extra,
+        'sleep':       sleep,
     })
 
 

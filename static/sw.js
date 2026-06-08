@@ -3,9 +3,9 @@
  * Cachea: assets estáticos, tiles de OpenStreetMap
  */
 
-const CACHE_STATIC  = 'health-static-v2';
-const CACHE_TILES   = 'health-tiles-v2';
-const CACHE_API     = 'health-api-v2';
+const CACHE_STATIC  = 'health-static-v6';
+const CACHE_TILES   = 'health-tiles-v6';
+const CACHE_API     = 'health-api-v6';
 
 const STATIC_ASSETS = [
   '/static/css/base.css',
@@ -59,7 +59,30 @@ self.addEventListener('fetch', event => {
   }
 
   // Todo lo demás → red directamente
+  // Para HTML: siempre red, nunca caché
+  if (event.request.headers.get('Accept')?.includes('text/html')) {
+    event.respondWith(fetch(event.request).catch(() => new Response('', {status:503})));
+    return;
+  }
   event.respondWith(fetch(event.request).catch(() => new Response('', {status:503})));
+});
+
+// ── Caché de fuentes externas ────────────────────────────────────────────────────
+self.addEventListener('fetch', event => {
+  const url = event.request.url;
+  if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com') || url.includes('cdnjs.cloudflare.com')) {
+    event.respondWith(
+      caches.open('health-fonts-v1').then(cache =>
+        cache.match(event.request).then(cached => {
+          if (cached) return cached;
+          return fetch(event.request).then(response => {
+            if (response.ok) cache.put(event.request, response.clone());
+            return response;
+          }).catch(() => cached || new Response('', {status:503}));
+        })
+      )
+    );
+  }
 });
 
 // ── Estrategia Cache First ─────────────────────────────────────────────────────

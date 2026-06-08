@@ -77,6 +77,10 @@ def create_app():
     with app.app_context():
         init_db()
 
+    # ── Warm-up del caché en background ──────────────────────────────────────
+    from services.cache import warm_cache_async
+    warm_cache_async()  # solo días sin caché
+
     # Debug solo si DEBUG=1
     if os.environ.get('DEBUG') == '1':
         app.register_blueprint(debug_bp)

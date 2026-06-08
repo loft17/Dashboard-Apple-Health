@@ -310,7 +310,7 @@ def get_day_data_batch(date_str: str) -> dict:
         'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
         'HKQuantityTypeIdentifierRestingHeartRate',
         'HKQuantityTypeIdentifierAppleExerciseTime',
-        'HKQuantityTypeIdentifierAppleStandHour',
+        'HKCategoryTypeIdentifierAppleStandHour',
         'HKQuantityTypeIdentifierAppleStandTime',
         'HKQuantityTypeIdentifierFlightsClimbed',
         'HKQuantityTypeIdentifierVO2Max',
@@ -343,28 +343,10 @@ def get_day_data_batch(date_str: str) -> dict:
     result = {}
 
     # ── Pasos (priorizar Apple Watch sobre iPhone) ────────────────────────────
-    step_rows = by_type.get('HKQuantityTypeIdentifierStepCount', [])
-    if step_rows:
-        by_src: dict = {}
-        for r in step_rows:
-            src = (r['source_name'] or 'unknown').strip()
-            by_src[src] = by_src.get(src, 0.0) + (r['value'] or 0.0)
-        def _prio(s):
-            sl = s.lower()
-            return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
-        result['steps'] = int(by_src[min(by_src, key=_prio)])
-        # Serie por hora (mejor fuente)
-        best_src = min(by_src, key=_prio)
-        best_rows = [r for r in step_rows if (r['source_name'] or 'unknown').strip() == best_src]
-        hourly_steps = {}
-        for r in best_rows:
-            try: h = int(r['start_date'][11:13])
-            except: h = 0
-            hourly_steps[h] = hourly_steps.get(h, 0) + (r['value'] or 0)
-        result['steps_series'] = [{'h': h, 'v': round(v)} for h, v in sorted(hourly_steps.items())]
-    else:
-        result['steps'] = 0
-        result['steps_series'] = []
+    # Pasos: deduplicados por hora con prioridad Watch > iPhone > otras
+    _steps_total, _steps_series = _steps_deduplicated(date_str)
+    result['steps']        = _steps_total
+    result['steps_series'] = _steps_series
 
     # ── Distancia ─────────────────────────────────────────────────────────────
     dist_rows = by_type.get('HKQuantityTypeIdentifierDistanceWalkingRunning', [])
@@ -442,8 +424,9 @@ def get_day_data_batch(date_str: str) -> dict:
     result['ex_min'] = int(sum(r['value'] or 0 for r in ex_rows))
 
     # ── De pie ────────────────────────────────────────────────────────────────
-    stand_rows = by_type.get('HKQuantityTypeIdentifierAppleStandHour', [])
-    result['stand_h'] = len([r for r in stand_rows if (r['value_str'] or '').endswith('Stood')])
+    stand_rows = by_type.get('HKCategoryTypeIdentifierAppleStandHour', [])
+    stood = [r for r in stand_rows if (r['value_str'] or '').endswith('Stood')]
+    result['stand_h'] = len(stood) if stood else len(stand_rows)
 
     # ── Pisos ─────────────────────────────────────────────────────────────────
     pisos_rows = by_type.get('HKQuantityTypeIdentifierFlightsClimbed', [])
@@ -469,25 +452,55 @@ def get_day_data_batch(date_str: str) -> dict:
 
 
 # ── Pasos (deduplicado por fuente) ────────────────────────────────────────────
-def get_steps_for_day(date_str: str) -> int:
+def _steps_deduplicated(date_str: str) -> tuple[int, list]:
+    """
+    Calcula pasos reales combinando fuentes por intervalo de tiempo.
+    Para cada intervalo de tiempo, usa la fuente de mayor prioridad que tenga datos.
+    Watch > iPhone > otras. Si no se solapan, suma ambas fuentes.
+    Devuelve (total, series_por_hora).
+    """
     if not DB_FILE.exists():
-        return 0
+        return 0, []
+
+    def prio(s):
+        sl = (s or '').lower()
+        return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
+
     with get_conn() as conn:
         rows = conn.execute(
-            'SELECT value, source_name FROM records '
-            'WHERE type=? AND date_day=?',
+            'SELECT value, source_name, start_date, end_date FROM records '
+            'WHERE type=? AND date_day=? ORDER BY start_date',
             ('HKQuantityTypeIdentifierStepCount', date_str)
         ).fetchall()
+
     if not rows:
-        return 0
-    by_src: dict[str, float] = {}
+        return 0, []
+
+    # Agrupar por hora y fuente
+    # Para cada hora: coger solo la fuente de mayor prioridad que tenga datos
+    from collections import defaultdict
+    by_hour_src: dict = defaultdict(lambda: defaultdict(float))
     for r in rows:
+        if not r['value']: continue
+        try: h = int(r['start_date'][11:13])
+        except: h = 0
         src = (r['source_name'] or 'unknown').strip()
-        by_src[src] = by_src.get(src, 0.0) + (r['value'] or 0.0)
-    def prio(s):
-        sl = s.lower()
-        return 0 if 'watch' in sl else (1 if 'iphone' in sl else 2)
-    return int(by_src[min(by_src, key=prio)])
+        by_hour_src[h][src] += r['value']
+
+    total = 0
+    series = []
+    for h in sorted(by_hour_src.keys()):
+        srcs = by_hour_src[h]
+        best = min(srcs.keys(), key=prio)
+        val = round(srcs[best])
+        total += val
+        series.append({'h': h, 'v': val})
+
+    return total, series
+
+def get_steps_for_day(date_str: str) -> int:
+    total, _ = _steps_deduplicated(date_str)
+    return total
 
 
 # ── Distancia (respeta unidad km/m) ──────────────────────────────────────────
@@ -925,10 +938,24 @@ def _metric(date_str: str, hk_type: str, agg: str = 'avg',
 
     with get_conn() as conn:
         if agg == 'count':
-            row = conn.execute(
-                'SELECT COUNT(*) FROM records WHERE type=? AND date_day=?',
-                (hk_type, date_str)
-            ).fetchone()
+            # Para AppleStandHour: preferir 'Stood', si no hay ninguno contar todos
+            if hk_type == 'HKCategoryTypeIdentifierAppleStandHour':
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM records WHERE type=? AND date_day=? AND value_str='Stood'",
+                    (hk_type, date_str)
+                ).fetchone()
+                stood_count = row[0] if row else 0
+                if stood_count == 0:
+                    # Fallback: contar todos los registros de esa hora
+                    row = conn.execute(
+                        'SELECT COUNT(*) FROM records WHERE type=? AND date_day=?',
+                        (hk_type, date_str)
+                    ).fetchone()
+            else:
+                row = conn.execute(
+                    'SELECT COUNT(*) FROM records WHERE type=? AND date_day=?',
+                    (hk_type, date_str)
+                ).fetchone()
             val = row[0] if row else 0
             return {'value': val if val else None, 'min': None, 'max': None, 'series': []}
 
@@ -981,7 +1008,8 @@ def get_all_metrics(date_str: str) -> dict:
 
     # ── Actividad ──────────────────────────────────────────────────────────────
     actividad = {
-        'pasos':          {**_metric(d, 'HKQuantityTypeIdentifierStepCount', 'sum', 1, 0),
+        'pasos':          {'value': get_steps_for_day(d),
+                          'min': None, 'max': None,
                           'series': _steps_by_hour(d)},
         'cal_activas':    _metric(d, 'HKQuantityTypeIdentifierActiveEnergyBurned',   'sum', 1, 0),
         'cal_basales':    _metric(d, 'HKQuantityTypeIdentifierBasalEnergyBurned',    'sum', 1, 0),
@@ -1201,6 +1229,51 @@ def get_sleep_score(date_str: str) -> dict:
         ],
     }
 
+
+def get_day_compare(date_str: str) -> dict:
+    """
+    Devuelve los valores clave del día y del día anterior para comparativa.
+    Incluye: pasos, distancia, calorias, ex_min, stand_h, floors, sleep_min,
+             energy_rest, effort, weight.
+    """
+    from datetime import datetime, timedelta
+    prev = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    def day_vals(d: str) -> dict:
+        sl = get_sleep_day(d) or {}
+        return {
+            'steps':       get_steps_for_day(d),
+            'distance':    round(get_distance_km(d), 2),
+            'calories':    get_calories(d),
+            'ex_min':      get_exercise_minutes(d),
+            'stand_h':     get_stand_hours(d),
+            'floors':      round(_sum_numeric(d, {'HKQuantityTypeIdentifierFlightsClimbed'}) or 0),
+            'sleep_min':   sl.get('total_min', 0) or 0,
+            'sleep_deep':  round(sl.get('deep_min', 0) or 0),
+            'sleep_rem':   round(sl.get('rem_min', 0) or 0),
+            'energy_rest': round(_avg_numeric(d, 'HKQuantityTypeIdentifierBasalEnergyBurned') or 0),
+            'effort':      round(_avg_numeric(d, 'HKQuantityTypeIdentifierAppleExerciseTime') or 0),
+            'weight':      round(_last_numeric(d, 'HKQuantityTypeIdentifierBodyMass') or 0, 1),
+            'wrist_temp':  round(_avg_numeric(d, 'HKQuantityTypeIdentifierAppleSleepingWristTemperature') or 0, 1),
+            'daylight':    round(_avg_numeric(d, 'HKQuantityTypeIdentifierTimeInDaylight') or 0),
+            'audio':       round(_sum_numeric(d, {'HKCategoryTypeIdentifierAudioExposureEvent'}) or 0),
+            'water':       round(_sum_numeric(d, {'HKQuantityTypeIdentifierDietaryWater'}) or 0),
+        }
+
+    curr = day_vals(date_str)
+    prev_d = day_vals(prev)
+
+    result = {}
+    for key, val in curr.items():
+        pval = prev_d.get(key, 0) or 0
+        diff = round(val - pval, 2) if val and pval else None
+        result[key] = {
+            'value': val,
+            'prev':  pval,
+            'diff':  diff,
+            'better': diff > 0 if diff is not None and key != 'weight' else (diff < 0 if diff is not None else None),
+        }
+    return result
 
 def get_recovery_score(date_str: str) -> dict | None:
     """

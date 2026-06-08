@@ -116,7 +116,7 @@
   cursor: pointer; transition: background .12s; color: var(--text);
 }
 .wk-card:hover { background: var(--surface-2); }
-.wk-card-icon { width: 32px; height: 32px; color: var(--muted); }
+.wk-card-icon { width: 32px; height: 32px; color: var(--muted); display:flex; align-items:center; justify-content:center; font-size: 24px; }
 .wk-card-icon svg { width: 100%; height: 100%; }
 .wk-card-name { font-size: 12px; font-weight: 600; text-align: center; }
 .wk-card-dur  { font-size: 11px; color: var(--muted); font-family: 'Roboto', sans-serif; }
@@ -518,7 +518,8 @@
 /* Anillos compactos */
 .ds-rings-block {
   display: flex; flex-direction: column; align-items: center;
-  gap: 10px; flex-shrink: 0;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .ds-rings-legend { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .ds-rl-row { display: flex; align-items: center; gap: 5px; }
@@ -529,9 +530,11 @@
 /* Grid de métricas principales */
 .ds-metrics-grid {
   flex: 1; display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
 }
+/* Anillo ocupa 3 columnas del ancho */
+.rings-card { grid-column: span 3; }
 
 .ds-metric-card {
   background: var(--bg); border: 1px solid var(--border);
@@ -566,8 +569,13 @@
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 8px;
   padding: 10px 14px 14px;
+  align-items: start;
 }
 
+.es-mc-cmp {
+  font-size: 10px; font-family: var(--font-mono);
+  font-weight: 600; margin-top: 3px; letter-spacing: .01em;
+}
 .es-metric-card {
   background: var(--bg); border: 1px solid var(--border);
   border-radius: 10px; padding: 11px 13px;
@@ -796,3 +804,114 @@
 }
 /* Evitar que el skeleton rompa el layout */
 .ds-mc-value .skeleton { min-width: 60px; height: 2rem; vertical-align: middle; }
+
+/* ── Codepen Activity Rings ──────────────────────────────────────────────────*/
+.rings-card { min-height: 290px; }
+.circles-container { position: relative; height: 250px; width: 250px; }
+
+.dot {
+  z-index: 2; position: absolute;
+  height: 100%; width: 100%;
+  transition: transform 400ms;
+  transform: rotate(0);
+}
+.dot:after {
+  content: ''; position: absolute;
+  transform: translateX(-50%); left: 50%;
+  height: 32px; width: 32px;
+  background: transparent; border-radius: 100%;
+  box-shadow: 3px 0px 3px rgba(0,0,0,0.24);
+}
+.ring {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  top: 50%; left: 50%;
+  border-radius: 100%;
+}
+.ring:before {
+  content: ''; position: absolute;
+  height: 100%; width: 100%; border-radius: 100%;
+}
+.ring:after {
+  content: ''; position: absolute;
+  transform: translate(-50%, -50%);
+  top: 50%; left: 50%;
+  height: 57px; width: 57px;
+  background: transparent; border-radius: 100%;
+}
+.progress-ring {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  top: 50%; left: 50%;
+}
+.progress-ring__circle {
+  transition: stroke-dashoffset 350ms;
+  transform: rotate(270deg);
+  transform-origin: 50% 50%;
+}
+.activity.ring { height: 250px; width: 250px; background: rgba(246,51,122,.22); }
+.activity.ring:before { box-shadow: 1px 0 3px rgba(246,51,122,.48); }
+
+.exercise.ring { height: 185px; width: 185px; background: rgba(111,228,48,.22); }
+
+.stand.ring    { height: 122px; width: 122px; background: rgba(21,194,224,.22); }
+
+
+
+/* Exercise ring: :after debe tener el tamaño del stand ring y ocultar su fondo
+   para que el stand ring se vea limpio sobre el fondo blanco */
+.activity.ring:after {
+  box-shadow: inset 1px 0 3px rgba(246,51,122,.48);
+  height: 185px !important; width: 185px !important;
+  background: transparent;
+}
+.exercise.ring:after {
+  box-shadow: inset 1px 0 3px rgba(111,228,48,.48);
+  height: 122px !important; width: 122px !important;
+  background: var(--surface);
+}
+.stand.ring:after {
+  box-shadow: inset 1px 0 3px rgba(21,194,224,.3);
+  height: 57px !important; width: 57px !important;
+  background: var(--bg);
+}
+
+/* ── Rings info panel ───────────────────────────────────────────────────────*/
+.rings-info { display: flex; flex-direction: column; gap: 16px; justify-content: center; min-width: 180px; }
+.rings-info-row { display: flex; align-items: center; gap: 12px; }
+.rings-info-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.rings-info-text { display: flex; flex-direction: column; gap: 1px; }
+.rings-info-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  color: var(--muted); font-family: var(--font-mono);
+}
+.rings-info-value {
+  font-size: 13px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2;
+}
+.rings-info-pct {
+  font-size: 10px; color: var(--muted); font-family: var(--font-mono);
+}
+
+/* ── Mini rings ─────────────────────────────────────────────────────────────*/
+.mini-ring-wrap {
+  display: grid; width: 52px; height: 52px; flex-shrink: 0;
+}
+.mini-ring-wrap svg {
+  grid-area: 1/1; width: 52px; height: 52px;
+}
+.mini-ring-pct {
+  grid-area: 1/1; display: flex; align-items: center;
+  justify-content: center; pointer-events: none;
+}
+.mini-ring-pct-val {
+  font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+  text-align: center; line-height: 1;
+}
+
+.rings-info-pct {
+  font-size: 10px; color: var(--muted); font-family: var(--font-mono);
+  font-weight: 600; margin-top: 1px;
+}

@@ -49,18 +49,113 @@
 
   {# Fila 1: Actividad + métricas clave #}
   <div class="ds-top">
-    {# Anillos #}
-    <div class="ds-rings-block">
-      <canvas id="rings-canvas" width="120" height="120"></canvas>
-      <div class="ds-rings-legend">
-        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#ff3b5c"></span><span class="ds-rl-key">Mov.</span><span class="ds-rl-val" id="act-move" style="color:#ff3b5c">—</span></div>
-        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#34c759"></span><span class="ds-rl-key">Ej.</span><span class="ds-rl-val" id="act-ex" style="color:#34c759">—</span></div>
-        <div class="ds-rl-row"><span class="ds-rl-dot" style="background:#30b0c7"></span><span class="ds-rl-key">Pie</span><span class="ds-rl-val" id="act-stand" style="color:#30b0c7">—</span></div>
-      </div>
-    </div>
 
     {# Métricas principales en grid #}
     <div class="ds-metrics-grid">
+
+      <div class="ds-metric-card rings-card" style="background:var(--bg);border-color:var(--bg);padding:20px;display:flex;flex-direction:row;align-items:center;gap:28px">
+        <div class="circles-container">
+          <div class="activity ring" id="ring-activity">
+            <div class="dot"></div>
+            <svg class="progress-ring" height="250" width="250">
+              <defs>
+                <linearGradient id="aGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#F6337A"/>
+                  <stop offset="100%" stop-color="#F71046"/>
+                </linearGradient>
+              </defs>
+              <circle class="progress-ring__circle" id="ring-c-activity"
+                      stroke-width="32" stroke-linecap="round" stroke="url(#aGradient)"
+                      fill="transparent" r="109" cx="125" cy="125"/>
+            </svg>
+          </div>
+          <div class="exercise ring" id="ring-exercise">
+            <div class="dot"></div>
+            <svg class="progress-ring" height="185" width="185">
+              <defs>
+                <linearGradient id="eGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#B1FD36"/>
+                  <stop offset="100%" stop-color="#6FE430"/>
+                </linearGradient>
+              </defs>
+              <circle class="progress-ring__circle" id="ring-c-exercise"
+                      stroke-width="32" stroke-linecap="round" stroke="url(#eGradient)"
+                      fill="transparent" r="77" cx="92.5" cy="92.5"/>
+            </svg>
+          </div>
+          <div class="stand ring" id="ring-stand">
+            <div class="dot"></div>
+            <svg class="progress-ring" height="122" width="122">
+              <defs>
+                <linearGradient id="sGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#15C2E0"/>
+                  <stop offset="100%" stop-color="#1EF8D5"/>
+                </linearGradient>
+              </defs>
+              <circle class="progress-ring__circle" id="ring-c-stand"
+                      stroke-width="32" stroke-linecap="round" stroke="url(#sGradient)"
+                      fill="transparent" r="45" cx="61" cy="61"/>
+            </svg>
+          </div>
+        </div>
+        <!-- Info de actividad a la derecha con mini-anillos -->
+        <div class="rings-info">
+          <!-- MOVIMIENTO -->
+          <div class="rings-info-row">
+            <div class="mini-ring-wrap">
+              <svg width="52" height="52" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(246,51,122,.2)" stroke-width="6"/>
+                <circle id="mini-ring-move" cx="26" cy="26" r="20" fill="none"
+                  stroke="#F6337A" stroke-width="6" stroke-linecap="round"
+                  stroke-dasharray="0 126" transform="rotate(-90 26 26)"
+                  style="transition:stroke-dasharray .8s ease"/>
+              </svg>
+              <div class="mini-ring-pct"><i class="fa-solid fa-bolt" style="color:#F6337A;font-size:13px"></i></div>
+            </div>
+            <div class="rings-info-text">
+              <div class="rings-info-label">MOVIMIENTO</div>
+              <div class="rings-info-value" style="color:#F6337A" id="act-move">— CAL</div>
+              <div class="rings-info-pct" id="act-move-pct">0%</div>
+            </div>
+          </div>
+          <!-- EJERCICIO -->
+          <div class="rings-info-row">
+            <div class="mini-ring-wrap">
+              <svg width="52" height="52" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(111,228,48,.2)" stroke-width="6"/>
+                <circle id="mini-ring-ex" cx="26" cy="26" r="20" fill="none"
+                  stroke="#6FE430" stroke-width="6" stroke-linecap="round"
+                  stroke-dasharray="0 126" transform="rotate(-90 26 26)"
+                  style="transition:stroke-dasharray .8s ease"/>
+              </svg>
+              <div class="mini-ring-pct"><i class="fa-solid fa-person-walking" style="color:#6FE430;font-size:13px"></i></div>
+            </div>
+            <div class="rings-info-text">
+              <div class="rings-info-label">EJERCICIO</div>
+              <div class="rings-info-value" style="color:#6FE430" id="act-ex">— MIN</div>
+              <div class="rings-info-pct" id="act-ex-pct">0%</div>
+            </div>
+          </div>
+          <!-- DE PIE -->
+          <div class="rings-info-row">
+            <div class="mini-ring-wrap">
+              <svg width="52" height="52" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(21,194,224,.2)" stroke-width="6"/>
+                <circle id="mini-ring-stand" cx="26" cy="26" r="20" fill="none"
+                  stroke="#15C2E0" stroke-width="6" stroke-linecap="round"
+                  stroke-dasharray="0 126" transform="rotate(-90 26 26)"
+                  style="transition:stroke-dasharray .8s ease"/>
+              </svg>
+              <div class="mini-ring-pct"><i class="fa-solid fa-arrow-up" style="color:#15C2E0;font-size:13px"></i></div>
+            </div>
+            <div class="rings-info-text">
+              <div class="rings-info-label">DE PIE</div>
+              <div class="rings-info-value" style="color:#15C2E0" id="act-stand">— H</div>
+              <div class="rings-info-pct" id="act-stand-pct">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
 
       <div class="ds-metric-card ds-steps-dist-card">
@@ -90,21 +185,6 @@
         </div>
       </div>
 
-      <div class="ds-metric-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div class="ds-mc-label">FC Media</div>
-            <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span><span id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span></div>
-          </div>
-          <i class="fa-solid fa-heart" style="font-size:18px;color:var(--muted);margin-top:4px;flex-shrink:0"></i>
-        </div>
-
-        <div class="chart-wrap" style="position:relative;margin-top:6px">
-          <canvas id="hr-chart" class="metric-chart" height="70"></canvas>
-          <div id="hr-chart-tip" style="display:none;position:absolute;background:rgba(17,17,17,.9);color:#fff;padding:5px 9px;border-radius:8px;font-size:11px;font-family:var(--font-mono);pointer-events:none;z-index:99;white-space:nowrap;transform:translateX(-50%)"></div>
-        </div>
-        <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
-      </div>
 
       <div class="ds-metric-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -135,6 +215,21 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="ds-metric-card" style="grid-column:span 2">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="ds-mc-label">FC Media</div>
+            <div class="ds-mc-value"><span id="hr-current">—</span><span class="ds-mc-unit">PPM</span><span id="hr-range" style="font-size:11px;color:var(--muted);margin-left:6px"></span></div>
+          </div>
+          <i class="fa-solid fa-heart" style="font-size:18px;color:var(--muted);margin-top:4px;flex-shrink:0"></i>
+        </div>
+        <div class="chart-wrap" style="position:relative;margin-top:6px">
+          <canvas id="hr-chart" class="metric-chart" height="100"></canvas>
+          <div id="hr-chart-tip" style="display:none;position:absolute;background:transparent;padding:0;font-family:var(--font-mono);pointer-events:none;z-index:99;text-align:center"></div>
+        </div>
+        <div class="ds-mc-foot"><span id="hr-avg">—</span> PPM media</div>
       </div>
 
       <div class="ds-metric-card">
@@ -597,129 +692,57 @@ const link = document.getElementById('extra-panel-toggle');
 
 // ── Anillos ───────────────────────────────────────────────────────────────────
 // ── Anillos — Canvas 2D ───────────────────────────────────────────────────────
-const RINGS = [
-  { id: 'ring-move',  r: 50, color: '#ff3b5c', bg: '#3d0010' },
-  { id: 'ring-ex',    r: 36, color: '#34c759', bg: '#0a3018' },
-  { id: 'ring-stand', r: 22, color: '#30b0c7', bg: '#003040' },
+// ── Activity Rings (codepen style) ───────────────────────────────────────────
+let _goals = { move: 500, ex: 30, stand: 12 };
+
+// Inicializar los círculos con getTotalLength() exactamente como el codepen
+const _ringDefs = [
+  { name: 'activity', circleId: 'ring-c-activity', dotId: 'ring-activity', key: 'move' },
+  { name: 'exercise', circleId: 'ring-c-exercise', dotId: 'ring-exercise', key: 'ex'   },
+  { name: 'stand',    circleId: 'ring-c-stand',    dotId: 'ring-stand',    key: 'stand'},
 ];
-const RING_W = 11;
-let _ringPct = { 'ring-move': 0, 'ring-ex': 0, 'ring-stand': 0 };
-let _ringAnim = null;
+const _circles = {};
 
-function drawRings(pcts) {
-  const canvas = document.getElementById('rings-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const cx = 60, cy = 60;
-  ctx.clearRect(0, 0, 140, 140);
-
-  RINGS.forEach(ring => {
-    const pct = Math.max(0, pcts[ring.id] || 0);
-    const start = -Math.PI / 2;          // 12h
-
-    // Fondo del anillo
-    ctx.beginPath();
-    ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
-    ctx.strokeStyle = ring.bg;
-    ctx.lineWidth = RING_W;
-    ctx.stroke();
-
-    if (pct <= 0) return;
-
-    // Arco principal (hasta 100%)
-    const mainEnd = start + Math.min(pct, 1) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, ring.r, start, mainEnd);
-    ctx.strokeStyle = ring.color;
-    ctx.lineWidth = RING_W;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    // Overflow: arco extra encima con sombra
-    if (pct > 1) {
-      const ovPct = (pct - 1) % 1 || 1;
-      const ovEnd = start + ovPct * Math.PI * 2;
-
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.6)';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(cx, cy, ring.r, start, ovEnd);
-      ctx.strokeStyle = ring.color;
-      ctx.lineWidth = RING_W;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      ctx.restore();
-    }
+function initRings() {
+  _ringDefs.forEach(rd => {
+    const circle = document.getElementById(rd.circleId);
+    const dot    = document.getElementById(rd.dotId)?.querySelector('.dot');
+    if (!circle) return;
+    const length = circle.getTotalLength();
+    circle.style.strokeDasharray  = length + ' ' + length;
+    circle.style.strokeDashoffset = length;
+    _circles[rd.key] = { circle, dot, length, value: 0, limit: _goals[rd.key] || 1 };
   });
 }
 
-// Animación suave desde 0 hasta los valores objetivo
+function setRingProgress(key, value, limit) {
+  const c = _circles[key];
+  if (!c) return;
+  c.value = value;
+  c.limit = limit || _goals[key] || 1;
+  const percent = c.value / c.limit * 100;
+
+  if (percent <= 100) {
+    c.circle.style.strokeDashoffset = c.length - (percent / 100) * c.length;
+  } else {
+    c.circle.style.strokeDashoffset = 0;
+  }
+  if (c.dot) c.dot.style.transform = `rotate(${Math.min(percent, 200) * 3.6}deg)`;
+}
+
 function animateRings(targets) {
-  if (_ringAnim) cancelAnimationFrame(_ringAnim);
-  const start = { ..._ringPct };
-  const duration = 1200; // ms
-  const t0 = performance.now();
-
-  function ease(t) {
-    // ease-out cubic
-    return 1 - Math.pow(1 - t, 3);
-  }
-
-  function step(now) {
-    const elapsed = now - t0;
-    const progress = Math.min(elapsed / duration, 1);
-    const e = ease(progress);
-
-    const current = {};
-    RINGS.forEach(r => {
-      current[r.id] = start[r.id] + (targets[r.id] - start[r.id]) * e;
-    });
-
-    drawRings(current);
-    _ringPct = current;
-
-    if (progress < 1) _ringAnim = requestAnimationFrame(step);
-    else _ringPct = { ...targets };
-  }
-
-  _ringAnim = requestAnimationFrame(step);
+  // targets: { 'ring-move': pct, 'ring-ex': pct, 'ring-stand': pct }
+  if (Object.keys(_circles).length === 0) initRings();
+  const keyMap = { 'ring-move': 'move', 'ring-ex': 'ex', 'ring-stand': 'stand' };
+  Object.entries(targets).forEach(([ringKey, pct]) => {
+    const key   = keyMap[ringKey] || ringKey;
+    const limit = _goals[key] || 1;
+    const value = pct * limit;
+    setRingProgress(key, value, limit);
+  });
 }
 
-function setRing(id, pct) { /* no-op, usamos animateRings */ }
-
-function resetRingInstant(id) { /* no-op */ }
-
-// ── Mini barras // ── Mini barras con tooltip ───────────────────────────────────────────────────
-function renderMiniBars(series) {
-  const wrap = document.getElementById('mini-bars');
-  if (!wrap) return;
-  if (!wrap) return;
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  if (!series || !series.length) return;
-  const max = Math.max(...series.map(s => s.v), 1);
-  for (let h = 0; h < 24; h++) {
-    const pt  = series.find(s => s.h === h);
-    const pct = pt ? Math.max(5, (pt.v / max) * 100) : 0;
-    const bar = document.createElement('div');
-    bar.className = 'mini-bar' + (pt ? ' active' : '');
-    bar.style.height = pct + '%';
-    if (pt) {
-      bar.addEventListener('mouseenter', e => {
-        _canvasHover = true;
-        showTooltip(e.clientX, e.clientY,
-          `<b>${h}:00–${h+1}:00</b><br>${fmtN(pt.v,1)} kcal`);
-      });
-      bar.addEventListener('mousemove', e => {
-        gTooltip.style.left = (e.clientX+12)+'px';
-        gTooltip.style.top  = (e.clientY-10)+'px';
-      });
-      bar.addEventListener('mouseleave', () => hideTooltipForce());
-    }
-    wrap.appendChild(bar);
-  }
-}
+function setRing(id, pct) { /* no-op */ }
 
 // ── Gráfica de línea suave (spline) con tooltip ───────────────────────────────
 function drawLineChart(canvasId, series, color, fillColor, labelFn, tipId) {
@@ -897,6 +920,10 @@ function drawSleepChart(segments) {
 // ── Render entrenamientos ─────────────────────────────────────────────────────
 function renderWorkouts(workouts) {
   const list = document.getElementById('workouts-list');
+  // Limpiar siempre primero
+  const wkCountEl = document.getElementById('workouts-count');
+  if (wkCountEl) wkCountEl.textContent = '';
+  list.innerHTML = '';
   if (!workouts || !workouts.length) {
     list.innerHTML = '<div class="workout-empty">Sin entrenamientos<br>registrados</div>';
     return;
@@ -910,7 +937,7 @@ function renderWorkouts(workouts) {
     const href = w._idx != null ? `/workouts/${w._idx}` : null;
     // Iconos SVG simples por tipo
     const SVG = {
-      'Caminar':   '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="13.5" cy="3.2" r="1.8"/><path d="M9.8 8.9l1.8-2.2c.5-.6 1.2-.8 1.9-.5l3.2 1.2 1.6 2.8h1.7v2h-3l-1.4-2.4-.8 3.2 2.5 2.3v5.3H15v-4.2l-2.6-2.4-1.2 4.2-3.5 2-.9-1.6 3-1.7 1.3-5-1.2-1.1-1.3 1.8H6v-2h2.5l1.3-1.9z"/><path d="M8.5 19.8l-1.2-1.4 2.4-1.4.6 1.9-1.8.9z"/></svg>',
+      'Caminar':   '<i class="fa-solid fa-person-walking"></i>',
       'Correr':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="14" cy="4" r="1.5"/><path d="M9 18l3-7 3 2 2-5"/><path d="M12 11l-3 3"/></svg>',
       'Ciclismo':  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M6 15l6-9 3 4h3"/></svg>',
       'Fuerza':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 12h16M7 8v8M17 8v8M2 10v4M22 10v4"/></svg>',
@@ -989,6 +1016,171 @@ function drawStepsHourBars(canvasId, tipId, series, goalSteps) {
     };
     canvas.onmouseleave = () => { tip.style.display = 'none'; };
   }
+}
+
+// ── Gráfica FC detallada estilo Garmin/Apple ─────────────────────────────────
+function drawHRDetailed(canvasId, tipId, rawData, minHR, maxHR) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !rawData || rawData.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 400;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0,0,W,H);
+
+  // Parsear series — raw tiene {t:'HH:MM', v} o series tiene {h, v}
+  const pts_raw = rawData.map(d => ({
+    t: d.t || (d.h !== undefined ? String(d.h).padStart(2,'0')+':00' : '00:00'),
+    v: d.v
+  })).filter(d => d.v > 0);
+  if (pts_raw.length < 2) return;
+
+  const vals = pts_raw.map(d => d.v);
+  const vMin = Math.min(...vals);
+  const vMax = Math.max(...vals);
+  const pad  = Math.max((vMax - vMin) * 0.15, 5);
+  const yMin = Math.floor((vMin - pad) / 10) * 10;
+  const yMax = Math.ceil((vMax + pad)  / 10) * 10;
+  const yRange = yMax - yMin;
+
+  const MARGIN_L = 36, MARGIN_B = 20, MARGIN_T = 8;
+  const CW = W - MARGIN_L - 4;
+  const CH = H - MARGIN_B - MARGIN_T;
+
+  // Eje X basado en hora real de los datos
+  const parseMinutes = t => { const p=t.split(':'); return parseInt(p[0])*60+(parseInt(p[1])||0); };
+  const tFirst = parseMinutes(pts_raw[0].t);
+  const tLast  = parseMinutes(pts_raw[pts_raw.length-1].t);
+  const tRange = Math.max(tLast - tFirst, 60);
+  const toX = i  => MARGIN_L + (parseMinutes(pts_raw[i].t) - tFirst) / tRange * CW;
+  const toY = v  => MARGIN_T + (1 - (v - yMin) / yRange) * CH;
+
+  // Zonas de fondo (sutiles)
+  const zones = [
+    {from: 0.9, color:'rgba(255,60,60,0.08)'},
+    {from: 0.8, color:'rgba(255,120,40,0.07)'},
+    {from: 0.7, color:'rgba(255,200,50,0.06)'},
+    {from: 0.6, color:'rgba(80,200,80,0.06)'},
+    {from: 0.0, color:'rgba(80,160,255,0.05)'},
+  ];
+  const effMax = maxHR > 0 ? maxHR : (yMax + 10);
+  zones.forEach((z,i) => {
+    const yTop = i===0 ? MARGIN_T : Math.max(MARGIN_T, toY(z.from * effMax));
+    const yBot = i===zones.length-1 ? MARGIN_T+CH : Math.min(MARGIN_T+CH, toY(zones[i+1]?.from * effMax || 0));
+    if (yBot > yTop) {
+      ctx.fillStyle = z.color;
+      ctx.fillRect(MARGIN_L, yTop, CW, yBot-yTop);
+    }
+  });
+
+  // Eje Y — 3 valores
+  ctx.fillStyle = 'rgba(120,120,120,0.7)';
+  ctx.font = '10px var(--font-mono, monospace)';
+  ctx.textAlign = 'right';
+  [yMin, Math.round((yMin+yMax)/2), yMax].forEach(v => {
+    const y = toY(v);
+    ctx.fillText(v, MARGIN_L - 4, y + 3);
+    ctx.beginPath(); ctx.moveTo(MARGIN_L, y); ctx.lineTo(W-4, y);
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1; ctx.stroke();
+  });
+
+  // Eje X — del primer al último registro, máx 6 etiquetas
+  ctx.font = '9px var(--font-mono, monospace)';
+  ctx.fillStyle = 'rgba(120,120,120,0.7)';
+  const hFirst = Math.floor(tFirst/60);
+  const hLast  = Math.ceil(tLast/60);
+  const hSpan  = hLast - hFirst || 1;
+  const hStep  = hSpan <= 4 ? 1 : hSpan <= 8 ? 2 : hSpan <= 16 ? 3 : 4;
+  const shownHours = [];
+  for (let h = hFirst; h <= hLast; h += hStep) shownHours.push(h);
+  if (shownHours[shownHours.length-1] !== hLast) shownHours.push(hLast);
+  shownHours.forEach((h, i) => {
+    const x = MARGIN_L + ((h*60 - tFirst) / tRange) * CW;
+    const clampedX = Math.max(MARGIN_L, Math.min(MARGIN_L+CW, x));
+    ctx.textAlign = i === 0 ? 'left' : i === shownHours.length-1 ? 'right' : 'center';
+    ctx.fillText(h + ':00', clampedX, H - 4);
+  });
+
+  // Fill área bajo la curva
+  const grad = ctx.createLinearGradient(0, MARGIN_T, 0, MARGIN_T+CH);
+  grad.addColorStop(0, 'rgba(255,80,80,0.18)');
+  grad.addColorStop(1, 'rgba(255,80,80,0)');
+  ctx.beginPath();
+  ctx.moveTo(toX(0), MARGIN_T+CH);
+  pts_raw.forEach((d,i) => ctx.lineTo(toX(i), toY(d.v)));
+  ctx.lineTo(toX(pts_raw.length-1), MARGIN_T+CH);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Línea principal
+  ctx.beginPath();
+  pts_raw.forEach((d,i) => i===0 ? ctx.moveTo(toX(i),toY(d.v)) : ctx.lineTo(toX(i),toY(d.v)));
+  ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+
+  // Tooltip
+  const tip = tipId ? document.getElementById(tipId) : null;
+  if (!tip) return;
+
+  let lastBest = -1;
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    let best=0, bestD=Infinity;
+    pts_raw.forEach((d,i) => { const dx=Math.abs(toX(i)-mx); if(dx<bestD){bestD=dx;best=i;} });
+    if (lastBest !== best) {
+      lastBest = best;
+      // Redibujar
+      ctx.clearRect(0,0,W,H);
+      // zonas
+      zones.forEach((z,i) => {
+        const yTop = i===0 ? MARGIN_T : Math.max(MARGIN_T, toY(z.from * effMax));
+        const yBot = i===zones.length-1 ? MARGIN_T+CH : Math.min(MARGIN_T+CH, toY(zones[i+1]?.from * effMax || 0));
+        if (yBot > yTop) { ctx.fillStyle=z.color; ctx.fillRect(MARGIN_L,yTop,CW,yBot-yTop); }
+      });
+      // grid lines
+      ctx.textAlign='right'; ctx.fillStyle='rgba(120,120,120,0.7)'; ctx.font='10px var(--font-mono,monospace)';
+      [yMin, Math.round((yMin+yMax)/2), yMax].forEach(v => {
+        const y=toY(v); ctx.fillText(v,MARGIN_L-4,y+3);
+        ctx.beginPath(); ctx.moveTo(MARGIN_L,y); ctx.lineTo(W-4,y);
+        ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.lineWidth=1; ctx.stroke();
+      });
+      ctx.font='9px var(--font-mono,monospace)'; ctx.fillStyle='rgba(120,120,120,0.7)';
+      shownHours.forEach((h,i) => {
+        const x = Math.max(MARGIN_L, Math.min(MARGIN_L+CW, MARGIN_L+((h*60-tFirst)/tRange)*CW));
+        ctx.textAlign = i===0?'left':i===shownHours.length-1?'right':'center';
+        ctx.fillText(h+':00', x, H-4);
+      });
+      // fill
+      ctx.beginPath(); ctx.moveTo(toX(0),MARGIN_T+CH);
+      pts_raw.forEach((d,i) => ctx.lineTo(toX(i),toY(d.v)));
+      ctx.lineTo(toX(pts_raw.length-1),MARGIN_T+CH); ctx.closePath();
+      ctx.fillStyle=grad; ctx.fill();
+      // line
+      ctx.beginPath();
+      pts_raw.forEach((d,i) => i===0?ctx.moveTo(toX(i),toY(d.v)):ctx.lineTo(toX(i),toY(d.v)));
+      ctx.strokeStyle='#ff4444'; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+      // línea vertical
+      const px=toX(best);
+      ctx.beginPath(); ctx.moveTo(px,MARGIN_T); ctx.lineTo(px,MARGIN_T+CH);
+      ctx.strokeStyle='rgba(255,68,68,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+      // punto
+      ctx.beginPath(); ctx.arc(px,toY(pts_raw[best].v),4,0,Math.PI*2);
+      ctx.fillStyle='#ff4444'; ctx.fill();
+      ctx.beginPath(); ctx.arc(px,toY(pts_raw[best].v),7,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,68,68,0.35)'; ctx.lineWidth=2; ctx.stroke();
+    }
+    const d = pts_raw[best];
+    tip.innerHTML = `<span style="background:#ff4444;color:#fff;padding:3px 8px;border-radius:12px;font-weight:700;font-size:12px">${d.v} PPM</span><br><span style="font-size:10px;font-weight:600;color:var(--text);background:rgba(255,255,255,0.9);padding:1px 5px;border-radius:4px;display:inline-block;margin-top:2px">${d.t}</span>`;
+    tip.style.display = 'block';
+    const rawTx = toX(best) / canvas.width * rect.width;
+    // Medir después de mostrar
+    const tipW = tip.getBoundingClientRect().width || 80;
+    const tx = Math.max(0, Math.min(rawTx - tipW/2, rect.width - tipW));
+    tip.style.left = tx + 'px';
+    tip.style.top  = Math.max(4, (toY(d.v)/canvas.height*rect.height)-38)+'px';
+  };
+  canvas.onmouseleave = () => { tip.style.display='none'; lastBest=-1; };
 }
 
 // ── Gráfica FC con zonas de fondo ────────────────────────────────────────────
@@ -1329,11 +1521,51 @@ function updateDashboard(data) {
     'ring-stand': stand / 12,
   });
   const setEl = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
-  setEl('act-move',  `${fmtN(cal)} / 500 CAL`);
-  setEl('act-ex',    `${fmtN(exMin)} / 30 MIN`);
-  setEl('act-stand', `${fmtN(stand)} / 12 H`);
+  const goalMove  = data.goals?.calories_daily || 500;
+  const goalEx    = data.goals?.exercise_min   || 30;
+  const goalStand2 = data.goals?.stand_hours   || 12;
+  setEl('act-move',  `${fmtN(cal)} CAL / ${fmtN(goalMove)} META`);
+  setEl('act-ex',    `${fmtN(exMin)} MIN / ${goalEx} META`);
+  setEl('act-stand', `${fmtN(stand)} HORAS / ${goalStand2} META`);
+  // Mini-anillos: circunferencia r=20 → 2*pi*20 ≈ 125.7
+  const MINI_C = 125.7;
+  function setMiniRing(id, pctId, pct) {
+    const el = document.getElementById(id);
+    const pe = document.getElementById(pctId);
+    if (!el) return;
+    // Limpiar overlay del día anterior
+    const svg = el.closest('svg');
+    const oldOv = svg ? svg.getElementById(id + '-ov') : null;
+    if (oldOv) oldOv.remove();
+    const baseColor = el.getAttribute('stroke');
+    if (pct <= 1) {
+      // Progreso normal
+      el.setAttribute('stroke-dasharray', pct * MINI_C + ' ' + MINI_C);
+      el.setAttribute('stroke', baseColor);
+      el.style.filter = '';
+    } else {
+      // Superado 100%: completar la vuelta y oscurecer
+      el.setAttribute('stroke-dasharray', MINI_C + ' 0');
+      // Segunda vuelta: overlay con opacidad extra
+      const ovPct = Math.min((pct - 1), 1);
+      let ov = null;
+      if (!ov) {
+        ov = el.cloneNode();
+        ov.id = id + '-ov';
+        ov.style.transition = 'stroke-dasharray .8s ease';
+        svg.appendChild(ov);
+      }
+      ov.setAttribute('stroke-dasharray', ovPct * MINI_C + ' ' + MINI_C);
+      // Color más oscuro (usar filter brightness)
+      ov.setAttribute('stroke', baseColor);
+      ov.style.filter = 'brightness(0.55)';
+    }
+    if (pe) pe.textContent = Math.round(pct * 100) + '%';
+  }
+  setMiniRing('mini-ring-move',  'act-move-pct',  cal/goalMove);
+  setMiniRing('mini-ring-ex',    'act-ex-pct',    exMin/goalEx);
+  setMiniRing('mini-ring-stand', 'act-stand-pct', stand/goalStand2);
 
-  renderMiniBars(data.cal_series);
 
   // Pasos + distancia (tarjeta unificada)
   const goalSteps = data.goals?.steps_daily || 10000;
@@ -1351,7 +1583,7 @@ function updateDashboard(data) {
   document.getElementById('hr-current').textContent = hr.avg ? Math.round(hr.avg) : '—';
   document.getElementById('hr-avg').textContent     = hr.avg     || '—';
   document.getElementById('hr-range').textContent   = hr.min && hr.max ? `${hr.min}–${hr.max} PPM` : '—';
-  drawHRZones('hr-chart', 'hr-chart-tip', hr.series, hr.max || 0);
+  drawHRDetailed('hr-chart', 'hr-chart-tip', hr.raw || hr.series || [], hr.min || 0, hr.max || 0);
 
   // HRV
   const hrv = data.hrv || {};
@@ -1408,8 +1640,25 @@ function setLoadingState() {
       if (el) el.innerHTML = '<span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;</span>';
     });
   ['steps-bar'].forEach(id => { const el=document.getElementById(id); if(el) el.style.width='0%'; });
-  _ringPct = { 'ring-move': 0, 'ring-ex': 0, 'ring-stand': 0 };
-  drawRings(_ringPct);
+  // Reset rings to 0
+  ['move','ex','stand'].forEach(k => setRingProgress(k, 0, _goals[k]||1));
+  // Ocultar recuperación y limpiar FC
+  const recCard = document.getElementById('recovery-summary-card');
+  if (recCard) recCard.style.display = 'none';
+  const hrCanvas = document.getElementById('hr-chart');
+  if (hrCanvas) { const ctx = hrCanvas.getContext('2d'); ctx.clearRect(0,0,hrCanvas.width,hrCanvas.height); }
+  const hrTip = document.getElementById('hr-chart-tip');
+  if (hrTip) hrTip.style.display = 'none';
+  // Reset mini rings overlay
+  ['mini-ring-move','mini-ring-ex','mini-ring-stand'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('stroke-dasharray','0 126');
+      const svg = el.closest('svg');
+      const ov = svg?.getElementById(id+'-ov');
+      if (ov) ov.remove();
+    }
+  });
 }
 
 async function loadDay(d) {
@@ -2740,7 +2989,10 @@ async function exportDayPDF() {
 // ── Inicio ────────────────────────────────────────────────────────────────────
 syncButtons(currentDate);
 updateDateLabel(currentDate);
-loadDay(currentDate);
+document.fonts.ready.then(() => {
+  initRings();
+  loadDay(currentDate);
+});
 
 // Prefetch silencioso de días adyacentes tras 2 segundos de inactividad
 setTimeout(() => {

@@ -35,11 +35,22 @@ def health_data_page(date_param=None):
     except Exception as e:
         steps=calories=stand=ex_min=distance=0; sleep=hr=hrv={}; workouts=[]
 
+    from services.db import get_user_goals
+    from routes.dashboard import _cache_get, _build_day_data, _cache_set
+    goals   = get_user_goals()
+    # Usar caché del dashboard para el compare (evita recalcular)
+    cached = _cache_get(date_str)
+    if cached and 'compare' in cached:
+        compare = cached['compare']
+    else:
+        from services.db import get_day_compare
+        compare = get_day_compare(date_str)
     return render_template('health_data.html',
         date=date_str, daterange=daterange,
         steps=steps, calories=calories, sleep=sleep,
         hr=hr, hrv=hrv, stand=stand, ex_min=ex_min,
-        distance=distance, workouts=workouts)
+        distance=distance, workouts=workouts, goals=goals,
+        compare=compare)
 
 @health_data_bp.route('/api/salud/sections')
 @login_required
