@@ -2,6 +2,11 @@
 
 Dashboard personal para visualizar y analizar los datos exportados de Apple Health.
 
+![Dashboard principal](./data/img/dashboard.png)
+![Dashboard principal](./data/img/salud.png)
+
+
+
 ---
 
 ## Instalación
