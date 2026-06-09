@@ -122,6 +122,33 @@
   font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em;
   margin-bottom: 20px;
 }
+
+/* Toggle modo oscuro */
+.theme-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.theme-row-text {}
+.theme-row-label { font-size: 13px; font-weight: 500; color: var(--text); }
+.theme-row-sub   { font-size: 11px; color: var(--muted); font-family: var(--font-mono); margin-top: 3px; }
+
+.theme-toggle {
+  flex-shrink: 0;
+  width: 44px; height: 26px;
+  border-radius: 99px; border: none; cursor: pointer;
+  background: var(--border-2); position: relative;
+  transition: background .2s; outline: none;
+}
+.theme-toggle.on { background: var(--text); }
+.theme-toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: white; transition: transform .2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+.theme-toggle.on .theme-toggle-thumb { transform: translateX(18px); }
+
+.sett-msg.ok    { background: var(--green-light); border: 1px solid var(--green-dim); color: var(--green); }
+.sett-msg.error { background: var(--orange-light); border: 1px solid var(--orange-dim); color: var(--red); }
 </style>
 {% endblock %}
 
@@ -145,6 +172,10 @@
     <a class="sett-nav-item {% if section == 'export_ai' %}active{% endif %}"
        href="/ajustes?s=export_ai">
       <span class="sett-nav-icon">🤖</span> Exportar para IA
+    </a>
+    <a class="sett-nav-item {% if section == 'appearance' %}active{% endif %}"
+       href="/ajustes?s=appearance">
+      <span class="sett-nav-icon">🌙</span> Apariencia
     </a>
     <div class="sett-nav-sep"></div>
     <a class="sett-nav-item {% if section == 'obsidian' %}active{% endif %}"
@@ -399,6 +430,32 @@
       </div>
     </div>
 
+    {# ── APARIENCIA ────────────────────────────────────────────────────────────── #}
+    <div class="sett-panel {% if section == 'appearance' %}active{% endif %}">
+      <div class="sett-page-title">Apariencia</div>
+
+      <div class="sett-card">
+        <div class="sett-card-head">
+          <span class="sett-card-icon">🌙</span>
+          <div>
+            <div class="sett-card-title">Tema</div>
+            <div class="sett-card-sub">Personaliza el aspecto visual del dashboard</div>
+          </div>
+        </div>
+        <div class="sett-card-body">
+          <div class="theme-row">
+            <div class="theme-row-text">
+              <div class="theme-row-label">Modo oscuro</div>
+              <div class="theme-row-sub">Cambia el fondo y los colores a tonos oscuros</div>
+            </div>
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+              <span class="theme-toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     {# ── OBSIDIAN ──────────────────────────────────────────────────────────────── #}
     <div class="sett-panel {% if section == 'obsidian' %}active{% endif %}">
       <div class="sett-page-title">Exportar a Obsidian</div>
@@ -535,6 +592,22 @@ async function saveGoals() {
   msg.style.display = 'block';
   setTimeout(() => { msg.style.display = 'none'; }, 3000);
 }
+
+// ── Tema ──────────────────────────────────────────────────────────────────────
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.classList.toggle('on', dark);
+}
+function toggleTheme() {
+  applyTheme(!document.documentElement.classList.contains('dark'));
+}
+// Sincronizar estado inicial del toggle
+(function() {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.classList.toggle('on', document.documentElement.classList.contains('dark'));
+})();
 
 function downloadObsidian(e) {
   e.preventDefault();

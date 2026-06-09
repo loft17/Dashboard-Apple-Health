@@ -1,0 +1,260 @@
+/* workout_detail.css */
+
+.wkd-page { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.wkd-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.wkd-back {
+  display: flex; align-items: center; gap: 5px;
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--muted); text-decoration: none;
+  transition: all .15s; flex-shrink: 0;
+}
+.wkd-back:hover { border-color: var(--text); color: var(--text); }
+
+.wkd-export-btn {
+  display: flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--muted); flex-shrink: 0;
+  transition: all .15s;
+}
+.wkd-export-btn:hover { border-color: var(--text); color: var(--text); background: var(--accent-dim); }
+
+.wkd-title-block { flex: 1; min-width: 0; }
+.wkd-title {
+  font-size: 1.4rem; font-weight: 700;
+  letter-spacing: -.03em; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wkd-subtitle {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--muted); margin-top: 3px;
+}
+
+/* ── Tarjetas de stats ───────────────────────────────────────────────────── */
+.wkd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.wkd-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 90px;
+}
+
+.wkd-stat-icon {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: var(--dim);
+  opacity: .55;
+}
+
+.wkd-stat-key {
+  order: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding-right: 28px;
+}
+
+.wkd-stat-val {
+  order: 2;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -.04em;
+  color: var(--text);
+  line-height: 1;
+  margin-top: 10px;
+}
+
+.wkd-stat-unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+.wkd-stat-extra {
+  order: 3;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ── Tarjetas genéricas (mapa, gráficas, zonas, splits) ──────────────────── */
+.wkd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.wkd-card-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.wkd-card-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+
+/* ── Controles capa mapa ─────────────────────────────────────────────────── */
+.map-layer-btns { display: flex; gap: 4px; }
+.map-layer-btn {
+  height: 26px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: none; font-size: 11px; font-family: var(--font-mono);
+  color: var(--muted); cursor: pointer; transition: all .12s;
+}
+.map-layer-btn:hover  { border-color: var(--text); color: var(--text); }
+.map-layer-btn.active { border-color: var(--border-2); color: var(--text); background: var(--surface-2); }
+
+/* ── Mapa ────────────────────────────────────────────────────────────────── */
+#wkd-map { width: 100%; height: 440px; }
+#wkd-map.fullscreen {
+  position: fixed !important; inset: 0;
+  width: 100vw !important; height: 100vh !important;
+  z-index: 9999; border-radius: 0;
+}
+#map-fullscreen-btn.fullscreen { position: fixed; top: 10px; right: 10px; z-index: 10000; }
+
+.wkd-map-footer {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+}
+.wkd-mf-stat {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+}
+.wkd-mf-stat svg { color: var(--dim); flex-shrink: 0; }
+.wkd-mf-stat strong { color: var(--text); font-weight: 600; }
+.wkd-legend { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.wkd-leg-item {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+}
+.wkd-leg-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+
+/* ── Gráficas ────────────────────────────────────────────────────────────── */
+.wkd-charts .wkd-card-header,
+#hr-zones-card .wkd-card-header,
+#splits-card .wkd-card-header { border-bottom: none; }
+
+.wkd-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 700px) { .wkd-charts { grid-template-columns: 1fr; } }
+
+.wkd-chart-wrap { position: relative; padding: 8px 14px 14px; }
+canvas.wkd-chart { width: 100%; height: 120px; display: block; cursor: crosshair; }
+
+.wkd-chart-tooltip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--text); color: white;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 9px; border-radius: 6px; white-space: nowrap;
+  transform: translate(-50%, -115%);
+}
+.wkd-cursor-line {
+  position: absolute; top: 8px; bottom: 14px; width: 1px;
+  background: var(--border-2); pointer-events: none; display: none;
+}
+
+/* ── Eje X de las gráficas ───────────────────────────────────────────────── */
+.wkd-chart-xaxis {
+  position: relative;
+  height: 16px;
+  margin: 0 14px 8px;
+}
+.wkd-chart-xaxis span {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--dim);
+  white-space: nowrap;
+  top: 0;
+}
+
+/* ── Zonas FC ────────────────────────────────────────────────────────────── */
+.hr-zones-wrap {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 18px;
+}
+.hr-zone-row { display: flex; align-items: center; gap: 10px; }
+.hr-zone-label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text); width: 110px; flex-shrink: 0;
+}
+.hr-zone-bar-track {
+  flex: 1; height: 8px;
+  background: var(--surface-2); border-radius: 99px; overflow: hidden;
+}
+.hr-zone-bar-fill { height: 100%; border-radius: 99px; transition: width .8s ease; }
+.hr-zone-time {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--muted); width: 52px; text-align: right; flex-shrink: 0;
+}
+
+/* ── Splits ──────────────────────────────────────────────────────────────── */
+.splits-table { width: 100%; border-collapse: collapse; }
+.splits-table th {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--dim); padding: 8px 18px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.splits-table td {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text); padding: 9px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.splits-table tr:last-child td { border-bottom: none; }
+.splits-table tr:hover td { background: var(--surface-2); }
+.split-bar {
+  display: inline-block; height: 5px;
+  background: var(--dim); border-radius: 3px;
+  vertical-align: middle; margin-right: 6px;
+}
+.split-best { color: #1a8a4a; font-weight: 600; }
+
+/* ── Sin ruta ────────────────────────────────────────────────────────────── */
+.wkd-no-route {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  height: 200px; color: var(--dim);
+}
+.wkd-no-route span:first-child { font-size: 32px; opacity: .4; }
+.wkd-no-route span:nth-child(2) { font-size: 13px; font-weight: 600; color: var(--muted); }
+.wkd-no-route span:last-child   { font-family: var(--font-mono); font-size: 11px; }

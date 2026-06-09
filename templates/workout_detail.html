@@ -3,106 +3,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<style>
-.wkd-page { display: flex; flex-direction: column; gap: 20px; }
-
-.wkd-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.wkd-back {
-  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
-  background: none; cursor: pointer; font-family: var(--font-mono); font-size: 12px;
-  color: var(--muted); text-decoration: none; display: flex; align-items: center; gap: 5px;
-  transition: all .15s;
-}
-.wkd-back:hover { border-color: var(--text); color: var(--text); }
-.wkd-title-block { flex: 1; }
-.wkd-title    { font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
-.wkd-subtitle { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
-
-/* Stats */
-.wkd-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.wkd-stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-.wkd-stat-val  { font-size: 1.5rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
-.wkd-stat-unit { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
-.wkd-stat-key  { font-size: 10px; color: var(--dim); font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
-.wkd-stat-extra { font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-top: 4px; line-height: 1.4; }
-
-/* Mapa */
-.wkd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-.wkd-card-header {
-  padding: 11px 16px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.wkd-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
-
-/* Controles del mapa */
-.map-layer-btns { display: flex; gap: 4px; }
-.map-layer-btn {
-  height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
-  background: none; font-size: 11px; font-family: var(--font-mono); color: var(--muted);
-  cursor: pointer; transition: all .12s;
-}
-.map-layer-btn:hover  { border-color: var(--text); color: var(--text); }
-.map-layer-btn.active { border-color: var(--text); color: var(--text); background: var(--surface-2); }
-
-#wkd-map { width: 100%; height: 460px; transition: height .2s; }
-#wkd-map.fullscreen {
-  position: fixed !important; top:0; left:0; width:100vw !important;
-  height:100vh !important; z-index:9999; border-radius:0;
-}
-#map-fullscreen-btn.fullscreen { position:fixed; top:10px; right:10px; z-index:10000; }
-
-.wkd-map-footer {
-  padding: 9px 16px; border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-}
-.wkd-mf-stat  { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
-.wkd-mf-stat strong { color: var(--text); }
-.wkd-legend   { display: flex; align-items: center; gap: 10px; margin-left: auto; }
-.wkd-leg-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
-.wkd-leg-dot  { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
-
-/* Gráficas */
-.wkd-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 700px) { .wkd-charts { grid-template-columns: 1fr; } }
-
-.wkd-chart-wrap { position: relative; padding: 6px 12px 12px; }
-canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair; }
-
-.wkd-chart-tooltip {
-  position: absolute; pointer-events: none; display: none;
-  background: rgba(17,17,17,.88); color: #fff;
-  font-family: var(--font-mono); font-size: 11px;
-  padding: 5px 10px; border-radius: 6px; white-space: nowrap;
-  transform: translate(-50%, -110%);
-}
-.wkd-cursor-line {
-  position: absolute; top: 6px; bottom: 12px; width: 1px;
-  background: rgba(0,0,0,.15); pointer-events: none; display: none;
-}
-
-/* Zonas FC */
-.hr-zones-wrap { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.hr-zone-row { display: flex; align-items: center; gap: 10px; }
-.hr-zone-label { font-size: 11px; font-family: var(--font-mono); color: var(--text); width: 110px; flex-shrink: 0; }
-.hr-zone-bar-track { flex: 1; height: 10px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
-.hr-zone-bar-fill  { height: 100%; border-radius: 99px; transition: width 1s ease; }
-.hr-zone-time { font-size: 11px; font-family: var(--font-mono); color: var(--muted); width: 50px; text-align: right; flex-shrink: 0; }
-
-/* Splits */
-.splits-table { width: 100%; border-collapse: collapse; }
-.splits-table th { font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 8px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-.splits-table td { font-size: 12px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); color: var(--text); }
-.splits-table tr:last-child td { border-bottom: none; }
-.splits-table tr:hover td { background: var(--surface-2); }
-.split-bar { display: inline-block; height: 6px; background: #5b8dee; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
-.split-best { color: #34c759; font-weight: 700; }
-
-/* Sin ruta */
-.wkd-no-route {
-  height: 240px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 10px; color: var(--muted);
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workout_detail.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -114,24 +15,39 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
       <div class="wkd-title">{{ workout.icon }} {{ workout.name }}</div>
       <div class="wkd-subtitle">{{ workout.date }} · {{ workout.time }} · {{ workout.source }}</div>
     </div>
+    <button class="wkd-export-btn" onclick="downloadWorkoutReport()" title="Exportar informe para análisis con IA">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Exportar para IA
+    </button>
   </div>
 
   <div class="wkd-stats">
     <div class="wkd-stat-card">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
       <div class="wkd-stat-val">{{ workout.duration_fmt }}</div>
       <div class="wkd-stat-key">Duración</div>
+      <div class="wkd-stat-extra" id="val-stop-time"></div>
+    </div>
+    <div class="wkd-stat-card">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg></div>
+      <div class="wkd-stat-val" id="val-time-start">{{ workout.time }}</div>
+      <div class="wkd-stat-key">Inicio · Fin</div>
+      <div class="wkd-stat-extra" id="val-time-end"></div>
     </div>
     {% if workout.dist_km > 0 %}
     <div class="wkd-stat-card">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
       <div class="wkd-stat-val">{{ workout.dist_km }}<span class="wkd-stat-unit"> km</span></div>
       <div class="wkd-stat-key">Distancia</div>
     </div>
     {% if workout.duration_min > 0 %}
     <div class="wkd-stat-card">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg></div>
       <div class="wkd-stat-val">{{ "%.1f"|format(workout.dist_km / workout.duration_min * 60) }}<span class="wkd-stat-unit"> km/h</span></div>
       <div class="wkd-stat-key">Velocidad media</div>
     </div>
     <div class="wkd-stat-card">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
       <div class="wkd-stat-val">{{ "%d'%02d\""|format((workout.duration_min / workout.dist_km)|int, ((workout.duration_min / workout.dist_km % 1) * 60)|int) }}</div>
       <div class="wkd-stat-key">Ritmo /km</div>
     </div>
@@ -139,29 +55,32 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
     {% endif %}
     {% if workout.kcal > 0 %}
     <div class="wkd-stat-card" id="card-kcal">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></div>
       <div class="wkd-stat-val">{{ workout.kcal }}<span class="wkd-stat-unit"> kcal</span></div>
       <div class="wkd-stat-key">Calorías activas</div>
       <div class="wkd-stat-extra" id="kcal-split" style="display:none"></div>
     </div>
     {% endif %}
     <div class="wkd-stat-card" id="card-desnivel" style="display:none">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="wkd-stat-val" id="val-desnivel">—</div>
       <div class="wkd-stat-key">Desnivel positivo</div>
     </div>
     <div class="wkd-stat-card" id="card-cadencia" style="display:none">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
       <div class="wkd-stat-val" id="val-cadencia">—<span class="wkd-stat-unit"> ppm</span></div>
       <div class="wkd-stat-key">Cadencia media</div>
     </div>
-    <div class="wkd-stat-card" id="card-moving" style="display:none">
-      <div class="wkd-stat-val" id="val-moving-time">—</div>
-      <div class="wkd-stat-key">Tiempo en movimiento</div>
-      <div class="wkd-stat-extra" id="val-moving-pct"></div>
+    <div class="wkd-stat-card" id="card-trimp" style="display:none">
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+      <div class="wkd-stat-val" id="val-trimp">—</div>
+      <div class="wkd-stat-key">Carga TRIMP</div>
+      <div class="wkd-stat-extra" id="val-trimp-label"></div>
     </div>
     <div class="wkd-stat-card" id="card-clima" style="display:none">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span id="val-clima-icon" style="font-size:1.3rem"></span>
-        <span class="wkd-stat-val" id="val-clima-temp">—</span>
-      </div>
+      <div class="wkd-stat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></div>
+      <span id="val-clima-icon" style="display:none"></span>
+      <div class="wkd-stat-val" id="val-clima-temp">—</div>
       <div class="wkd-stat-key" id="val-clima-desc">Clima</div>
       <div class="wkd-stat-extra" id="val-clima-extra"></div>
     </div>
@@ -192,10 +111,10 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
     </button>
     <div class="wkd-map-footer" id="wkd-footer" style="display:none">
-      <span class="wkd-mf-stat">GPS: <strong id="wkd-pts">—</strong> puntos</span>
-      <span class="wkd-mf-stat">Distancia: <strong id="wkd-dist">—</strong> km</span>
-      <span class="wkd-mf-stat">Velocidad: <strong id="wkd-spd">—</strong> · <strong id="wkd-spd-max">—</strong> km/h máx</span>
-      <span class="wkd-mf-stat">Altitud: <strong id="wkd-ele">—</strong> m</span>
+      <span class="wkd-mf-stat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg> <strong id="wkd-pts">—</strong> puntos</span>
+      <span class="wkd-mf-stat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> <strong id="wkd-dist">—</strong> km</span>
+      <span class="wkd-mf-stat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg> <strong id="wkd-spd">—</strong> · <strong id="wkd-spd-max">—</strong> km/h máx</span>
+      <span class="wkd-mf-stat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="3 20 12 4 21 20 3 20"/></svg> <strong id="wkd-ele">—</strong> m</span>
       <div class="wkd-legend">
         <div class="wkd-leg-item"><div class="wkd-leg-dot" style="background:#34c759"></div>Inicio</div>
         <div class="wkd-leg-item"><div class="wkd-leg-dot" style="background:#ff3b5c"></div>Fin</div>
@@ -213,6 +132,7 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
         <div class="wkd-cursor-line" id="ele-cursor-line"></div>
         <div class="wkd-chart-tooltip" id="ele-tooltip"></div>
       </div>
+      <div class="wkd-chart-xaxis" id="ele-xaxis"></div>
     </div>
 
     <div class="wkd-card">
@@ -222,6 +142,7 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
         <div class="wkd-cursor-line" id="spd-cursor-line"></div>
         <div class="wkd-chart-tooltip" id="spd-tooltip"></div>
       </div>
+      <div class="wkd-chart-xaxis" id="spd-xaxis"></div>
     </div>
 
     <div class="wkd-card" id="hr-chart-card" style="display:none">
@@ -231,6 +152,7 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
         <div class="wkd-cursor-line" id="hr-cursor-line"></div>
         <div class="wkd-chart-tooltip" id="hr-tooltip"></div>
       </div>
+      <div class="wkd-chart-xaxis" id="hr-xaxis"></div>
     </div>
 
   </div>
@@ -251,7 +173,7 @@ canvas.wkd-chart { width: 100%; height: 130px; display: block; cursor: crosshair
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--dim)" id="splits-label"></span>
     </div>
     <table class="splits-table" id="splits-table">
-      <thead><tr><th>Km</th><th>Ritmo</th><th>Velocidad</th><th>Altitud Δ</th><th></th></tr></thead>
+      <thead><tr><th>Km</th><th>Hora inicio</th><th>Hora fin</th><th>Ritmo</th><th>Velocidad</th><th>Altitud Δ</th><th></th></tr></thead>
       <tbody id="splits-body"></tbody>
     </table>
   </div>
@@ -289,16 +211,16 @@ const WMO_CODES = {
   80:'🌦|Chubascos ligeros', 81:'🌧|Chubascos', 82:'⛈|Chubascos fuertes',
   95:'⛈|Tormenta', 96:'⛈|Tormenta con granizo', 99:'⛈|Tormenta fuerte',
 };
-let _map, _tileLayer, _hoverMarker, _routeData;
+let _map, _tileLayer, _hoverMarker, _routeData, _hrData = [];
 
 // ── Capas de mapa ─────────────────────────────────────────────────────────────
 const LAYERS = {
-  streets:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  streets:   'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   topo:      'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
 };
 const ATTRIBS = {
-  streets:   '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  streets:   '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
   satellite: '© Esri',
   topo:      '© <a href="https://opentopomap.org">OpenTopoMap</a>',
 };
@@ -602,6 +524,8 @@ function addKmMarkers(map, points) {
       }
     }
 
+    const _totalDist = distCum[distCum.length - 1] || 0;
+
     setTimeout(() => {
       drawChart('ele-chart', eleData, '#5b8dee', 'rgba(91,141,238,0.18)',
         d => `${d.dist.toFixed(2)} km · ${Math.round(d.v)} m`,
@@ -609,6 +533,8 @@ function addKmMarkers(map, points) {
       drawChart('spd-chart', spdData, '#34c759', 'rgba(52,199,89,0.15)',
         d => `${d.dist.toFixed(2)} km · ${d.v.toFixed(1)} km/h`,
         'spd-cursor-line', 'spd-tooltip', onChartHover);
+      renderXAxis('ele-xaxis', _totalDist);
+      renderXAxis('spd-xaxis', _totalDist);
     }, 100);
 
     window.addEventListener('resize', () => {
@@ -624,7 +550,7 @@ function addKmMarkers(map, points) {
     });
 
     // ── Frecuencia cardíaca ──────────────────────────────────────────────────
-    let _hrData = [];
+    _hrData = [];
     try {
       const hrRes  = await fetch('/api/workouts/heartrate?start=' +
         encodeURIComponent(WK_START) + '&end=' + encodeURIComponent(WK_END));
@@ -667,9 +593,12 @@ function addKmMarkers(map, points) {
           _hoverMarker.setStyle({opacity: 1, fillOpacity: 1});
         }
 
-        setTimeout(() => drawChart('hr-chart', _hrData, '#ff3b5c', 'rgba(255,59,92,0.15)',
-          d => `${d.bpm} PPM`,
-          'hr-cursor-line', 'hr-tooltip', onHrHover), 120);
+        setTimeout(() => {
+          drawChart('hr-chart', _hrData, '#ff3b5c', 'rgba(255,59,92,0.15)',
+            d => `${d.bpm} PPM`,
+            'hr-cursor-line', 'hr-tooltip', onHrHover);
+          renderXAxis('hr-xaxis', _totalDist);
+        }, 120);
 
         // ── Zonas de FC ────────────────────────────────────────────────────────
         computeHRZones(hrRows, WK_DUR_MIN);
@@ -747,6 +676,22 @@ function computeHRZones(hrRows, durMin) {
   document.getElementById('hr-zones-label').textContent =
     `FC máx entreno: ${hrMax} PPM · FC mín: ${hrMin} PPM`;
   document.getElementById('hr-zones-card').style.display = '';
+
+  // ── TRIMP (Edwards) ────────────────────────────────────────────────────────
+  const TRIMP_WEIGHTS = [1, 2, 3, 4, 5];
+  const trimp = Math.round(
+    zoneSecs.reduce((sum, secs, i) => sum + (secs / 60) * TRIMP_WEIGHTS[i], 0)
+  );
+  const trimpInfo =
+    trimp < 60  ? { text: 'Suave',     color: '#81c784' } :
+    trimp < 120 ? { text: 'Moderado',  color: '#ffb74d' } :
+    trimp < 200 ? { text: 'Duro',      color: '#e57373' } :
+                  { text: 'Muy duro',  color: '#ab47bc' };
+
+  document.getElementById('val-trimp').textContent       = trimp;
+  document.getElementById('val-trimp-label').innerHTML   =
+    `<span style="color:${trimpInfo.color};font-weight:600">${trimpInfo.text}</span>`;
+  document.getElementById('card-trimp').style.display    = '';
 }
 
 // ── Splits por km y mejor km ───────────────────────────────────────────────────
@@ -779,6 +724,7 @@ function computeSplits(points) {
 
       splits.push({
         km: kmN, secs,
+        tStart, tEnd,
         pace: minKm ? `${Math.floor(minKm)}'${Math.round((minKm%1)*60).toString().padStart(2,'0')}"` : '—',
         kmh:  kmh  ? kmh.toFixed(1) : '—',
         eleDelta,
@@ -799,14 +745,21 @@ function computeSplits(points) {
 
   const maxSecs = Math.max(...splits.map(s => s.secs || 0));
 
+  function fmtSplitTs(ms) {
+    if (!ms) return '—';
+    return new Date(ms).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+  }
+
   const tbody = document.getElementById('splits-body');
   tbody.innerHTML = splits.map((s, i) => {
-    const isBest = i === bestIdx;
-    const barW   = s.secs && maxSecs ? Math.round((1 - (s.secs - Math.min(...splits.map(x=>x.secs||maxSecs))) / (maxSecs - Math.min(...splits.map(x=>x.secs||maxSecs)) || 1)) * 80 + 20) : 20;
-    const eleStr = s.eleDelta > 0 ? `↑${s.eleDelta}m` : s.eleDelta < 0 ? `↓${Math.abs(s.eleDelta)}m` : '—';
+    const isBest   = i === bestIdx;
+    const barW     = s.secs && maxSecs ? Math.round((1 - (s.secs - Math.min(...splits.map(x=>x.secs||maxSecs))) / (maxSecs - Math.min(...splits.map(x=>x.secs||maxSecs)) || 1)) * 80 + 20) : 20;
+    const eleStr   = s.eleDelta > 0 ? `↑${s.eleDelta}m` : s.eleDelta < 0 ? `↓${Math.abs(s.eleDelta)}m` : '—';
     const eleColor = s.eleDelta > 0 ? '#e57373' : s.eleDelta < 0 ? '#81c784' : 'var(--muted)';
     return `<tr>
       <td>${s.km} km</td>
+      <td style="color:var(--muted)">${fmtSplitTs(s.tStart)}</td>
+      <td style="color:var(--muted)">${fmtSplitTs(s.tEnd)}</td>
       <td class="${isBest?'split-best':''}">${isBest?'⭐ ':''}${s.pace} /km</td>
       <td>${s.kmh} km/h</td>
       <td style="color:${eleColor}">${eleStr}</td>
@@ -851,11 +804,10 @@ function computeMovingTime(points, totalMin) {
     return h > 0 ? `${h}h ${min.toString().padStart(2,'0')}m` : `${min}m ${sec.toString().padStart(2,'0')}s`;
   };
 
-  document.getElementById('val-moving-time').textContent = fmtMin(movingMin);
-  document.getElementById('val-moving-pct').innerHTML =
-    `${movingPct}% del total<br>` +
-    `<span style="color:var(--dim)">Parado: ${fmtMin(Math.max(0,stopMin))}</span>`;
-  document.getElementById('card-moving').style.display = '';
+  const stopEl = document.getElementById('val-stop-time');
+  if (stopEl && stopMin > 0.5) {
+    stopEl.innerHTML = `Parado: <strong>${fmtMin(Math.max(0, stopMin))}</strong>`;
+  }
 }
 
 })();
@@ -889,4 +841,196 @@ document.addEventListener('keydown', e => {
 
 </script>
 {% endif %}
+
+<script>
+function renderXAxis(axisId, totalDist) {
+  const el = document.getElementById(axisId);
+  if (!el || totalDist <= 0) return;
+  const maxKm = Math.floor(totalDist);
+  let html = '';
+  for (let km = 0; km <= maxKm; km++) {
+    const pct = (km / totalDist) * 100;
+    const style = km === 0
+      ? 'left:0;transform:none'
+      : `left:${pct.toFixed(1)}%;transform:translateX(-50%)`;
+    html += `<span style="${style}">${km} km</span>`;
+  }
+  if (totalDist - maxKm > 0.08) {
+    html += `<span style="left:100%;transform:translateX(-100%)">${totalDist.toFixed(1)} km</span>`;
+  }
+  el.innerHTML = html;
+}
+
+const WK_META = {
+  name:         {{ workout.name         | tojson }},
+  date:         {{ workout.date         | tojson }},
+  time:         {{ workout.time         | tojson }},
+  source:       {{ workout.source       | tojson }},
+  duration_fmt: {{ workout.duration_fmt | tojson }},
+  duration_min: {{ workout.duration_min }},
+  dist_km:      {{ workout.dist_km }},
+  kcal:         {{ workout.kcal }},
+  start:        {{ workout.start | default('') | tojson }},
+  end:          {{ workout.end   | default('') | tojson }},
+};
+
+// Poblar hora de fin en la tarjeta Inicio · Fin
+(function () {
+  function extractHHMM(ts) {
+    if (!ts) return null;
+    const m = ts.match(/(\d{2}:\d{2}):\d{2}/);
+    return m ? m[1] : null;
+  }
+  const endTime = extractHHMM(WK_META.end);
+  if (endTime) {
+    const el = document.getElementById('val-time-end');
+    if (el) el.textContent = '→ ' + endTime;
+  }
+})();
+
+function downloadWorkoutReport() {
+  const lines = [];
+  const today = new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+  lines.push(`# Informe de Entrenamiento — ${WK_META.name}`);
+  lines.push(`*Generado el ${today} para análisis con IA*`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // ── Resumen ────────────────────────────────────────────────────────────────
+  lines.push('## Resumen');
+  lines.push(`- **Actividad:** ${WK_META.name}`);
+  lines.push(`- **Fecha:** ${WK_META.date}`);
+  if (WK_META.time)   lines.push(`- **Hora de inicio:** ${WK_META.time}`);
+  if (WK_META.source) lines.push(`- **Dispositivo:** ${WK_META.source}`);
+  lines.push(`- **Duración total:** ${WK_META.duration_fmt}`);
+  if (WK_META.dist_km > 0) {
+    lines.push(`- **Distancia:** ${WK_META.dist_km} km`);
+    if (WK_META.duration_min > 0) {
+      const kmh     = (WK_META.dist_km / WK_META.duration_min * 60).toFixed(1);
+      const paceMin = Math.floor(WK_META.duration_min / WK_META.dist_km);
+      const paceSec = Math.round((WK_META.duration_min / WK_META.dist_km % 1) * 60);
+      lines.push(`- **Velocidad media:** ${kmh} km/h`);
+      lines.push(`- **Ritmo medio:** ${paceMin}'${String(paceSec).padStart(2,'0')}" /km`);
+    }
+  }
+  if (WK_META.kcal > 0) lines.push(`- **Calorías activas:** ${WK_META.kcal} kcal`);
+  const kcalSplit = document.getElementById('kcal-split');
+  if (kcalSplit && kcalSplit.style.display !== 'none')
+    lines.push(`- **Calorías totales:** ${kcalSplit.innerText.trim()}`);
+  lines.push('');
+
+  // ── Datos GPS ─────────────────────────────────────────────────────────────
+  if (typeof _routeData !== 'undefined' && _routeData?.points) {
+    lines.push('## Datos GPS');
+    lines.push(`- **Puntos registrados:** ${_routeData.n_points.toLocaleString('es-ES')}`);
+    lines.push(`- **Distancia GPS:** ${_routeData.dist_km} km`);
+    if (_routeData.speed_avg) lines.push(`- **Velocidad media:** ${_routeData.speed_avg} km/h`);
+    if (_routeData.speed_max) lines.push(`- **Velocidad máxima:** ${_routeData.speed_max} km/h`);
+    if (_routeData.ele_min != null) lines.push(`- **Altitud:** ${_routeData.ele_min}–${_routeData.ele_max} m`);
+    if (_routeData.ele_gain != null) lines.push(`- **Desnivel positivo:** ${_routeData.ele_gain} m`);
+    lines.push('');
+  }
+
+  // ── Frecuencia cardíaca ───────────────────────────────────────────────────
+  if (typeof _hrData !== 'undefined' && _hrData.length > 0) {
+    const bpms  = _hrData.map(d => d.bpm);
+    const hrMin = Math.min(...bpms);
+    const hrMax = Math.max(...bpms);
+    const hrAvg = Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length);
+    lines.push('## Frecuencia Cardíaca');
+    lines.push(`- **FC mínima:** ${hrMin} PPM`);
+    lines.push(`- **FC media:** ${hrAvg} PPM`);
+    lines.push(`- **FC máxima:** ${hrMax} PPM`);
+    lines.push('');
+  }
+
+  // ── Zonas FC ──────────────────────────────────────────────────────────────
+  const zonesCard = document.getElementById('hr-zones-card');
+  if (zonesCard && zonesCard.style.display !== 'none') {
+    lines.push('## Distribución en Zonas de FC');
+    const zonesLabel = document.getElementById('hr-zones-label')?.textContent?.trim();
+    if (zonesLabel) { lines.push(`*${zonesLabel}*`); lines.push(''); }
+    document.querySelectorAll('#hr-zones-wrap .hr-zone-row').forEach(row => {
+      const label = row.querySelector('.hr-zone-label')?.textContent?.trim() || '';
+      const time  = row.querySelector('.hr-zone-time')?.textContent?.trim()  || '';
+      const info  = row.children[3]?.textContent?.trim() || '';
+      if (label) lines.push(`- **${label}:** ${time}  (${info})`);
+    });
+    lines.push('');
+  }
+
+  // ── Splits ────────────────────────────────────────────────────────────────
+  const splitsCard = document.getElementById('splits-card');
+  if (splitsCard && splitsCard.style.display !== 'none') {
+    lines.push('## Splits por Kilómetro');
+    const splitsLabel = document.getElementById('splits-label')?.textContent?.trim();
+    if (splitsLabel) { lines.push(`*${splitsLabel}*`); lines.push(''); }
+    lines.push('| Km | Ritmo | Velocidad | Desnivel |');
+    lines.push('|----|-------|-----------|----------|');
+    document.querySelectorAll('#splits-body tr').forEach(row => {
+      const cells = [...row.querySelectorAll('td')];
+      if (cells.length >= 4) {
+        const km   = cells[0]?.textContent?.trim();
+        const pace = cells[1]?.textContent?.replace('⭐ ', '').trim();
+        const spd  = cells[2]?.textContent?.trim();
+        const ele  = cells[3]?.textContent?.trim();
+        lines.push(`| ${km} | ${pace} | ${spd} | ${ele} |`);
+      }
+    });
+    lines.push('');
+  }
+
+  // ── Tiempo en movimiento ──────────────────────────────────────────────────
+  const movingCard = document.getElementById('card-moving');
+  if (movingCard && movingCard.style.display !== 'none') {
+    lines.push('## Tiempo en Movimiento');
+    const movingTime = document.getElementById('val-moving-time')?.textContent?.trim();
+    const movingPct  = document.getElementById('val-moving-pct')?.innerText?.replace(/\n/g, ' ').trim();
+    if (movingTime) lines.push(`- **En movimiento:** ${movingTime}`);
+    if (movingPct)  lines.push(`- **Detalle:** ${movingPct}`);
+    lines.push('');
+  }
+
+  // ── Clima ─────────────────────────────────────────────────────────────────
+  const climaCard = document.getElementById('card-clima');
+  if (climaCard && climaCard.style.display !== 'none') {
+    lines.push('## Condiciones Meteorológicas');
+    const icon  = document.getElementById('val-clima-icon')?.textContent?.trim();
+    const temp  = document.getElementById('val-clima-temp')?.textContent?.trim();
+    const desc  = document.getElementById('val-clima-desc')?.textContent?.trim();
+    const extra = document.getElementById('val-clima-extra')?.textContent?.trim();
+    lines.push(`- ${icon} **${desc}:** ${temp}`);
+    if (extra) lines.push(`- ${extra}`);
+    lines.push('');
+  }
+
+  // ── Prompt sugerido ───────────────────────────────────────────────────────
+  lines.push('---');
+  lines.push('');
+  lines.push('## Prompt sugerido');
+  lines.push('');
+  lines.push(`Analiza este entrenamiento de ${WK_META.name}. Por favor incluye:`);
+  lines.push('');
+  lines.push('1. **Evaluación general** del rendimiento y nivel de esfuerzo');
+  if (zonesCard && zonesCard.style.display !== 'none')
+    lines.push('2. **Análisis de zonas de FC:** ¿fue un entrenamiento aeróbico, de tempo o de umbral? ¿Es coherente con el objetivo?');
+  if (splitsCard && splitsCard.style.display !== 'none')
+    lines.push('3. **Análisis de splits:** ¿corrí en negativo (acelerando) o positivo (decelerando)? ¿Dónde bajé el ritmo y por qué?');
+  lines.push('4. **Puntos fuertes** del entrenamiento');
+  lines.push('5. **Áreas de mejora** y recomendaciones concretas para el próximo entrenamiento similar');
+
+  // ── Descarga ──────────────────────────────────────────────────────────────
+  const content  = lines.join('\n');
+  const safeName = WK_META.name.replace(/[^\wáéíóúÁÉÍÓÚñÑ]/g, '_');
+  const blob     = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href     = url;
+  a.download = `entreno_${WK_META.date}_${safeName}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
 {% endblock %}

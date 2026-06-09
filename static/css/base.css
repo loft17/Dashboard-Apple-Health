@@ -35,6 +35,29 @@
   --radius-lg:    12px;
 }
 
+/* ── Modo oscuro ───────────────────────────────────────────────────────────── */
+html.dark {
+  --bg:          #111111;
+  --surface:     #1c1c1e;
+  --surface-2:   #2a2a2d;
+  --border:      rgba(255,255,255,.1);
+  --border-2:    rgba(255,255,255,.18);
+  --accent-dim:  rgba(255,255,255,.06);
+  --text:        #f0f0ee;
+  --muted:       #888886;
+  --dim:         #484845;
+  --green-dim:   rgba(26,138,74,.2);
+  --green-light: rgba(26,138,74,.12);
+  --orange-dim:  rgba(196,80,0,.2);
+  --orange-light: rgba(196,80,0,.12);
+  --blue-dim:    rgba(26,95,168,.2);
+  --blue-light:  rgba(26,95,168,.12);
+}
+
+html, body, html * {
+  transition: background-color .2s, border-color .2s, color .2s;
+}
+
 html, body {
   height: 100%;
   background: var(--bg);

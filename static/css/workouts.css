@@ -1,0 +1,246 @@
+/* ── CONFIGURACIÓN DE COLORES APPLE SALUD (MODO OSCURO) ───────────────── */
+:root {
+  --background: #000000;       /* Fondo negro puro de Apple */
+  --surface: #1c1c1e;          /* Gris oscuro para tarjetas (System Gray 6) */
+  --surface-2: #2c2c2e;        /* Gris más claro para hovers (System Gray 5) */
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #ffffff;
+  --muted: #8e8e93;            /* Gris secundario */
+  --dim: #636366;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: SFMono-Regular, SF Pro Text, Menlo, Monaco, Consolas, monospace;
+  
+  /* Colores de Actividad de Apple */
+  --apple-red: #ff2d55;        /* Movimiento (Calorías) */
+  --apple-green: #04de71;      /* Ejercicio (Minutos) */
+  --apple-blue: #007aff;       /* De pie (Horas) o Distancia */
+}
+
+/* Aplicar la fuente global para que luzca nativo */
+body {
+  background-color: var(--background);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── RESUMEN MENSUAL (TARJETA PRINCIPAL) ─────────────────────────────────── */
+.wk-monthly-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px; /* Bordes un poco más suaves estilo iOS */
+  padding: 18px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.wk-summary-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-family: var(--font-sans); /* Cambiado a sans para las etiquetas principales */
+  font-size: 14px;
+  color: var(--text);
+}
+
+.wk-summary-item {
+  display: flex;
+  flex-direction: column; /* Diseño vertical más limpio */
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0 20px 0 0;
+  border-right: 1px solid var(--border);
+  flex: 1;
+  min-width: 100px;
+}
+
+.wk-summary-item:last-child {
+  border-right: none;
+}
+
+.wk-summary-val {
+  font-size: 22px; /* Números grandes y claros */
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-family: var(--font-mono); /* Monospaciado solo para los números */
+}
+
+/* Colores específicos para cada métrica clave */
+.wk-summary-item:nth-child(1) .wk-summary-val { color: var(--apple-red); }
+.wk-summary-item:nth-child(2) .wk-summary-val { color: var(--apple-green); }
+.wk-summary-item:nth-child(3) .wk-summary-val { color: var(--apple-blue); }
+
+.wk-summary-key {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* ── LISTA DE ENTRENAMIENTOS ─────────────────────────────────────────────── */
+.wk-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.wk-header-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+
+.wk-header-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* Buscador y Filtros */
+.wk-search-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.wk-search-row input, .wk-search-row select {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: all .15s ease;
+}
+
+.wk-search-row input:focus, .wk-search-row select:focus {
+  border-color: var(--muted);
+  background: var(--surface-2);
+}
+
+/* Items de la lista */
+.wk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Un poco más de aire entre entrenamientos */
+}
+
+.wk-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.wk-item.has-route:hover {
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.wk-item-icon {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%; /* Iconos redondos como Apple Watch */
+  flex-shrink: 0;
+}
+
+/* Color verde para entrenamientos completados con ruta */
+.wk-item.has-route .wk-item-icon {
+  background: rgba(4, 222, 113, 0.15);
+  color: var(--apple-green);
+}
+
+.wk-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wk-item-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.wk-item-stat-main {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.wk-route-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: rgba(4, 222, 113, 0.12);
+  color: var(--apple-green);
+  border: 1px solid rgba(4, 222, 113, 0.2);
+}
+
+/* ── MODAL (DETALLE DEL ENTRENAMIENTO) ────────────────────────────────────── */
+.wk-modal-backdrop {
+  background: rgba(0, 0, 0, 0.85); /* Más oscuro para centrar la atención */
+  backdrop-filter: blur(10px);
+}
+
+.wk-modal {
+  background: #121212; /* Fondo aún más oscuro para el modal */
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: 0 30px 100px rgba(0,0,0,0.8);
+}
+
+.wk-modal-meta-item {
+  padding: 14px 20px;
+}
+
+.wk-modal-key {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.wk-modal-val {
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+/* Estadísticas flotantes sobre el mapa estilo cristal de Apple */
+.wk-map-stats {
+  bottom: 16px;
+  left: 16px;
+  background: rgba(28, 28, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wk-stat-val {
+  font-size: 16px;
+  color: #fff;
+  font-family: var(--font-mono);
+}
