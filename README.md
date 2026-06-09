@@ -1,10 +1,24 @@
-# Health Dashboard — Apple Health
+# Health Dashboard
 
-Dashboard personal para visualizar y analizar los datos exportados de Apple Health.
-
+Dashboard personal para visualizar y analizar los datos exportados de Apple Health. Diseño minimalista, modo oscuro, y herramientas para análisis con IA.
 
 ![Dashboard principal](./data/img/dashboard.png)
-![Dashboard principal](./data/img/salud.png)
+![Detalle de salud diaria](./data/img/salud.png)
+
+---
+
+## Características
+
+- **Dashboard diario** — anillos de actividad, pasos, calorías, FC, HRV y sueño de un vistazo
+- **Entrenamientos GPS** — mapa interactivo con perfil de altitud, velocidad, frecuencia cardíaca y splits por kilómetro
+- **Zonas de FC y carga TRIMP** — análisis del esfuerzo por zonas con score de carga de entrenamiento
+- **Histórico** — gráficas de tendencias para todas las métricas: pasos, peso, sueño, HRV, FC en reposo…
+- **ECG** — visualización de registros electrocardiográficos
+- **Resumen anual** — estadísticas del año al estilo Wrapped
+- **Logros** — sistema de gamificación con retos y hitos desbloqueables
+- **Exportar para IA** — genera un JSON estructurado para analizar tus datos con Claude o ChatGPT
+- **Exportar a Obsidian** — nota Markdown diaria lista para tu vault
+- **Modo oscuro** — activable desde Ajustes → Apariencia
 
 ---
 
@@ -19,132 +33,85 @@ Abre `http://127.0.0.1:5050` en el navegador.
 
 ---
 
+## Importar datos de Apple Health
+
+1. En el iPhone: **Salud → tu perfil → Exportar datos de salud**
+2. Envía el `.zip` al ordenador
+3. En el dashboard: **Ajustes → Importar datos** → arrastra el ZIP
+
+La importación es incremental: puedes subir exportaciones nuevas sin duplicar datos.
+
+---
+
 ## Configuración
 
-### Variables de entorno (opcionales)
+### Variables de entorno
 
 | Variable | Por defecto | Descripción |
 |----------|-------------|-------------|
 | `HEALTH_USER` | `admin` | Usuario de acceso |
-| `HEALTH_PASSWORD` | `admin` | Contraseña inicial (fuerza cambio al primer login) |
-| `SECRET_KEY` | Auto-generado | Clave de sesión (se guarda en `data/secret_key.txt`) |
+| `HEALTH_PASSWORD` | `admin` | Contraseña inicial |
+| `SECRET_KEY` | Auto-generado | Clave de sesión (persiste en `data/secret_key.txt`) |
 | `PORT` | `5050` | Puerto del servidor |
-| `DEBUG` | `0` | Activar modo debug (`1` = activado) |
+| `DEBUG` | `0` | Modo debug (`1` = activado) |
 
-### Primera vez
+Al entrar por primera vez con `admin` / `admin` el sistema obliga a cambiar las credenciales.
 
-Al entrar con `admin` / `admin` el sistema obliga a cambiar las credenciales antes de continuar.
+### Modo debug
 
----
-
-## Importar datos
-
-1. En el iPhone: **Salud → tu perfil → Exportar datos de salud**
-2. Envía el ZIP al ordenador
-3. En el dashboard: **Ajustes → Importar datos** y arrastra el ZIP
-
----
-
-## Modo Debug
-
-El modo debug activa endpoints adicionales para diagnóstico.
-
-**En Windows** (dos comandos separados):
+**Windows** (dos comandos separados):
 ```
 set DEBUG=1
 python app.py
 ```
 
-**En Linux / Mac**:
+**Linux / macOS**:
 ```bash
 DEBUG=1 python app.py
 ```
 
-> ⚠️ Con `set DEBUG=1 && python app.py` en Windows el `&&` **no** pasa la variable al proceso. Hay que ejecutarlos por separado.
-
-### Endpoints de debug (solo con DEBUG=1)
-
-| URL | Descripción |
-|-----|-------------|
-| `/api/debug/sleep-hist2` | Diagnóstico del sueño histórico |
-| `/api/debug/temp-check` | Datos de temperatura de muñeca |
-
-### Endpoints siempre disponibles
-
-| URL | Descripción |
-|-----|-------------|
-| `/api/types` | Lista todos los tipos de datos en la BD con conteos y fechas |
+> `set DEBUG=1 && python app.py` **no** funciona en Windows — el `&&` no pasa la variable al proceso hijo.
 
 ---
 
-## Estructura de archivos
-
-```
-health_dashboard/
-├── app.py                    # Punto de entrada
-├── requirements.txt
-├── README.md
-├── routes/                   # Blueprints Flask
-│   ├── main.py               # / → redirige según datos
-│   ├── auth.py               # /login /logout /change-password
-│   ├── dashboard.py          # /dashboard /api/day
-│   ├── health_data.py        # /salud/<date>
-│   ├── history.py            # /historico /api/history
-│   ├── workout.py            # /workouts /workouts/<idx>
-│   ├── ecg.py                # /ecg
-│   ├── wrapped.py            # /año/<year>
-│   ├── gamification.py       # /logros /api/gamification/*
-│   ├── settings.py           # /ajustes /api/settings/*
-│   └── debug.py              # Solo con DEBUG=1
-├── services/
-│   ├── db.py                 # SQLite — todas las queries
-│   ├── workout.py            # Parser de entrenamientos
-│   ├── ecg.py                # Parser de ECG
-│   └── gamification.py      # Rachas, logros, retos
-├── templates/                # HTML (Jinja2)
-├── static/
-│   ├── css/
-│   ├── js/
-│   ├── sw.js                 # Service Worker (caché offline)
-│   ├── manifest.json         # PWA
-│   └── favicon.svg
-└── data/                     # Generado en runtime (no en git)
-    ├── health.db             # Base de datos SQLite
-    ├── credentials.json      # Usuario/contraseña hasheados
-    └── secret_key.txt        # Clave de sesión persistente
-```
-
----
-
-## Páginas principales
+## Páginas
 
 | URL | Descripción |
 |-----|-------------|
-| `/dashboard` | Resumen del día con métricas clave y anillos |
-| `/salud/<fecha>` | Todos los datos de salud de un día |
+| `/dashboard` | Resumen del día: anillos, métricas clave y comparativa |
+| `/salud/<fecha>` | Todos los datos de salud de un día concreto |
 | `/historico` | Gráficas históricas de todas las métricas |
-| `/workouts` | Lista de entrenamientos con mapa de rutas |
-| `/workouts/<n>` | Detalle de un entrenamiento con mapa GPS |
-| `/ecg` | Registros de ECG |
-| `/historico` | Histórico con gráficas por período |
-| `/año/<año>` | Resumen anual estilo Wrapped |
-| `/logros` | Logros desbloqueados, retos y estadísticas |
-| `/ajustes` | Importar datos, credenciales, objetivos, Obsidian, exportar para IA |
+| `/workouts` | Lista de entrenamientos con mapa de calor de rutas |
+| `/workouts/<id>` | Detalle: mapa GPS, gráficas, splits, zonas de FC, TRIMP |
+| `/ecg` | Registros de ECG exportados desde el Apple Watch |
+| `/año` | Resumen anual estilo Wrapped |
+| `/logros` | Logros, retos y estadísticas acumuladas |
+| `/ajustes` | Importar datos, credenciales, objetivos, exportar |
+
+---
+
+## API y debug
+
+| URL | Solo debug | Descripción |
+|-----|-----------|-------------|
+| `/api/types` | No | Tipos de datos en la BD con conteos y fechas |
+| `/api/debug/sleep-hist2` | Sí | Diagnóstico del historial de sueño |
+| `/api/debug/temp-check` | Sí | Datos de temperatura de muñeca |
 
 ---
 
 ## Seguridad
 
-- Las credenciales se guardan hasheadas (SHA-256) en `data/credentials.json`
-- La SECRET_KEY se genera una vez y se persiste en `data/secret_key.txt`
-- Las sesiones duran 30 días
+- Credenciales hasheadas (SHA-256) en `data/credentials.json`
+- `SECRET_KEY` generada una vez y persistida en `data/secret_key.txt`
+- Sesiones de 30 días
 - Todas las rutas requieren autenticación excepto `/login` y `/sw.js`
-- Los endpoints de debug solo están activos con `DEBUG=1`
+- Endpoints de debug desactivados en producción
 
 ---
 
 ## Requisitos
 
 - Python 3.10+
-- Ver `requirements.txt` para dependencias
-
+- Flask 3.0+, Flask-Login, Flask-Compress
+- Ver `requirements.txt`
